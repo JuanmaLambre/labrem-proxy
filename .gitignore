@@ -1,0 +1,11 @@
+node_modules/
+.env
+certs/
+logs/
+*.log
+.DS_Store
+npm-debug.log*
+
+# Keep example files but ignore actual config
+targets.json
+!targets.json.example
