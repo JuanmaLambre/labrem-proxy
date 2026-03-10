@@ -27,9 +27,6 @@ app.use(
 app.use(morgan(process.env.LOG_LEVEL || "combined"));
 app.use(corsMiddleware);
 
-// Proxy middleware for /api routes
-app.use("/api", authMiddleware, targetMiddleware, proxyMiddleware);
-
 // Health check endpoint (no auth required)
 app.get("/health", (req, res) => {
   res.json({
@@ -39,6 +36,16 @@ app.get("/health", (req, res) => {
     app: "LabRem proxy",
   });
 });
+
+// Proxy middleware for /api routes
+app.use("/api", authMiddleware, targetMiddleware, proxyMiddleware);
+
+// Serve static files from the dist directory (CSS, JS, images)
+const distPath = path.join(__dirname, "../dist");
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+  console.log("Serving static files from:", distPath);
+}
 
 // Serve React app for all other routes (must be last)
 if (fs.existsSync(distPath)) {
