@@ -26,7 +26,9 @@ app.use(
 );
 app.use(morgan(process.env.LOG_LEVEL || "combined"));
 app.use(corsMiddleware);
-app.use("/", authMiddleware, targetMiddleware, proxyMiddleware);
+
+// Proxy middleware for /api routes
+app.use("/api", authMiddleware, targetMiddleware, proxyMiddleware);
 
 // Health check endpoint (no auth required)
 app.get("/health", (req, res) => {
@@ -37,6 +39,13 @@ app.get("/health", (req, res) => {
     app: "LabRem proxy",
   });
 });
+
+// Serve React app for all other routes (must be last)
+if (fs.existsSync(distPath)) {
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(distPath, "index.html"));
+  });
+}
 
 // Start server
 function startServer() {
