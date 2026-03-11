@@ -1,5 +1,6 @@
 require("dotenv").config();
 const express = require("express");
+const cookieParser = require("cookie-parser");
 const NodeCache = require("node-cache");
 const axios = require("axios");
 const morgan = require("morgan");
@@ -25,6 +26,7 @@ app.use(
   }),
 );
 app.use(morgan(process.env.LOG_LEVEL || "combined"));
+app.use(cookieParser());
 app.use(corsMiddleware);
 
 // Health check endpoint (no auth required)
