@@ -1,11 +1,13 @@
 import { useState } from "react";
 import classNames from "classnames";
+import { useLabRemAuthentication } from "../auth/laboratoriosRemotosAuth";
 
 function Login() {
   const [formData, setFormData] = useState({
-    username: "",
+    email: "",
     password: "",
   });
+  const { mutate: authenticate } = useLabRemAuthentication();
 
   const handleChange = (e) => {
     setFormData({
@@ -17,7 +19,11 @@ function Login() {
   const handleSubmit = (e) => {
     e.preventDefault();
     console.log("Login attempt:", formData);
-    // TODO: Implement OAuth login logic
+    authenticate(formData, {
+      onSuccess: (data) => {
+        console.log(">>> ", data);
+      },
+    });
   };
 
   return (
@@ -28,14 +34,14 @@ function Login() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
-              Username
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              Email
             </label>
             <input
               type="text"
-              id="username"
-              name="username"
-              value={formData.username}
+              id="email"
+              name="email"
+              value={formData.email}
               onChange={handleChange}
               required
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
@@ -44,7 +50,7 @@ function Login() {
 
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-              Password
+              Contraseña
             </label>
             <input
               type="password"
