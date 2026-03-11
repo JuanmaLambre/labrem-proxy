@@ -37,9 +37,6 @@ app.get("/health", (req, res) => {
   });
 });
 
-// Proxy middleware for /api routes
-app.use("/api", authMiddleware, targetMiddleware, proxyMiddleware);
-
 // Serve static files from the dist directory (CSS, JS, images)
 const distPath = path.join(__dirname, "../dist");
 if (fs.existsSync(distPath)) {
@@ -47,12 +44,15 @@ if (fs.existsSync(distPath)) {
   console.log("Serving static files from:", distPath);
 }
 
-// Serve React app for all other routes (must be last)
+// Serve specific HTML files for different routes
 if (fs.existsSync(distPath)) {
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(distPath, "index.html"));
+  app.get("/login", (req, res) => {
+    res.sendFile(path.join(distPath, "login.html"));
   });
 }
+
+// Proxy middleware for all other routes routes (must be last)
+app.use("*", authMiddleware, targetMiddleware, proxyMiddleware);
 
 // Start server
 function startServer() {

@@ -22,6 +22,8 @@ function Login() {
     authenticate(formData, {
       onSuccess: (data) => {
         console.log(">>> ", data);
+        // TODO: Update this
+        window.location.href = "/?experiencia=juanma";
       },
     });
   };
