@@ -22,8 +22,10 @@ function Login() {
     authenticate(formData, {
       onSuccess: (data) => {
         console.log(">>> ", data);
-        // TODO: Update this
-        window.location.href = "/?experiencia=juanma";
+        // TODO: Don't hardcode labrem target
+        document.cookie = `labrem_target=juanma; path=/; secure`;
+        document.cookie = `labrem_token=${data.token}; path=/; secure`;
+        window.location.href = "/";
       },
     });
   };
