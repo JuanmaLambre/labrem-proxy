@@ -1,6 +1,7 @@
 export default {
   port: process.env.PORT || 3456,
   defaultTarget: "default",
+  authenticationUrl: process.env.AUTHENTICATION_URL || "https://laboratorios-remotos-test.fi.uba.ar",
   cacheTtl: parseInt(process.env.CACHE_TTL_SECONDS || "300"),
   cacheCheckPeriod: parseInt(process.env.CACHE_CHECK_PERIOD_SECONDS || "60"),
   httpsEnabled: process.env.HTTPS_ENABLED === "true",

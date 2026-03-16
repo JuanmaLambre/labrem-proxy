@@ -54,7 +54,7 @@ if (fs.existsSync(distPath)) {
 }
 
 // Proxy middleware for all other routes routes (must be last)
-app.use("*", authMiddleware, targetMiddleware, proxyMiddleware);
+app.use("*", targetMiddleware, authMiddleware, proxyMiddleware);
 
 // Start server
 function startServer() {

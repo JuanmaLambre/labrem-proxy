@@ -1,81 +1,74 @@
-import { cache } from "../auth/cache.js";
+import axios from "axios";
+import { cache, fetchTokenCache, setInvalidCache, setTokenCache } from "../auth/cache.js";
+import config from "../config.js";
+import { Shift } from "../../client/src/models/Shift.js";
+
+const TOKEN_COOKIE_NAME = "labrem_token";
 
 function extractToken(req) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return null;
-
-  // Support both "Bearer TOKEN" and just "TOKEN"
-  const match = authHeader.match(/^Bearer\s+(.+)$/i);
-  if (match) return match[1];
-
-  return authHeader;
+  return req.cookies?.[TOKEN_COOKIE_NAME];
 }
 
-function fetchAuthInfo(token) {
-  const headers = { Authorization: `Bearer ${token}` };
-
-  // TODO: Pegarle a la API de turnos
-
-  return {
-    valid: data.valid === true || response.status === 200,
-    exitTime: data.exit_time || data.exitTime || data.exp || Date.now() / 1000 + 3600, // fallback to 1 hour
-    userInfo: data,
-  };
-}
-
-/**
- * Validate token and check exit time
- */
-async function validateToken(token) {
-  if (!token) return { valid: false, message: "No authentication token provided" };
-
-  // Check cache first
-  const cached = cache.get(token);
-  if (cached) {
-    console.log("Token found in cache");
-
-    // Check if exit time has passed
-    const now = Date.now() / 1000; // Current time in seconds
-    if (now > cached.exitTime) {
-      console.log("Token expired (exit time passed)");
-      cache.del(token);
-      return { valid: false, reason: "exit_time_exceeded" };
-    }
-
-    return { valid: true, userInfo: cached.userInfo };
-  }
-
-  // Not in cache, validate with OAuth API
-  console.log("Token not in cache, validating with OAuth API");
-  const validation = await validateTokenWithOAuth(token);
-
-  if (!validation.valid) {
-    return { valid: false, reason: "invalid_token" };
-  }
-
-  // Check exit time
-  const now = Date.now() / 1000;
-  if (now > validation.exitTime) {
-    console.log("Token expired immediately after validation (exit time passed)");
-    return { valid: false, reason: "exit_time_exceeded" };
-  }
-
-  // Cache the token with its exit time
-  cache.set(token, {
-    exitTime: validation.exitTime,
-    userInfo: validation.userInfo,
+async function fetchShifts(token) {
+  const response = await axios.get(`${config.authenticationUrl}/api/v1/shifts`, {
+    headers: { Authorization: `Bearer ${token}` },
   });
 
-  console.log(`Token cached until ${new Date(validation.exitTime * 1000).toISOString()}`);
+  if (response.status !== 200) {
+    return { valid: false, message: "No se pudieron obtener los turnos asignados" };
+  }
 
-  return { valid: true, userInfo: validation.userInfo };
+  return { valid: true, shifts: response.data };
+}
+
+function getActiveShift(shifts, experienceId) {
+  return shifts.find((s) => s.isOpen && s.experienceId === experienceId);
+}
+
+async function validateToken(token) {
+  if (!token) return { valid: false, message: "Necesita loguearse" };
+  const experienceId = req.targetServer.key;
+
+  const cached = fetchTokenCache(token);
+  if (cached) {
+    if (!cached.valid) return { valid: false, reason: "Token inválido" };
+
+    const shifts = Shift.hydrateAll(cached.shifts);
+    const activeShift = getActiveShift(shifts, experienceId);
+
+    if (activeShift) {
+      return { valid: true, userInfo: cached.userInfo };
+    } else if (cached.fresh) {
+      return { valid: false, message: "No hay turnos disponibles" };
+    }
+
+    // Cache data is considered stale, delete it and revalidate
+    cache.del(token);
+  }
+
+  // No data in cache, let's fetch it
+  console.log("Token not in cache, validating with LabRem API");
+  const shiftsValidation = await fetchShifts(token);
+
+  if (!shiftsValidation.valid) {
+    setInvalidCache(token);
+    return { valid: false, message: "Token inválido" };
+  }
+
+  setTokenCache(token, { shifts: shiftsValidation.shifts });
+  const shifts = Shift.hydrateAll(shiftsValidation.shifts);
+  const activeShift = getActiveShift(shifts, experienceId);
+
+  if (activeShift) {
+    return { valid: true };
+  } else {
+    return { valid: false, message: "No hay turnos disponibles" };
+  }
 }
 
 export async function authMiddleware(req, res, next) {
-  return next();
-
   const token = extractToken(req);
-  const validation = validateToken(token);
+  const validation = await validateToken(token);
 
   if (!validation.valid) {
     return res.status(401).json({
@@ -84,25 +77,5 @@ export async function authMiddleware(req, res, next) {
     });
   }
 
-  try {
-    const validation = await validateToken(token);
-
-    if (!validation.valid) {
-      return res.status(403).json({
-        error: "Forbidden",
-        message:
-          validation.reason === "exit_time_exceeded" ? "Access time has expired" : "Invalid authentication token",
-      });
-    }
-
-    // Attach user info to request for logging/debugging
-    req.userInfo = validation.userInfo;
-    next();
-  } catch (error) {
-    console.error("Authentication error:", error);
-    return res.status(503).json({
-      error: "Service Unavailable",
-      message: "Authentication service temporarily unavailable",
-    });
-  }
+  next();
 }

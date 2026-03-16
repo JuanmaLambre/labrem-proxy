@@ -4,7 +4,7 @@ const TARGET_COOKIE_NAME = "labrem_target";
 
 function getTargetServer(req) {
   // Priority: query param > cookie > default
-  let targetKey = req.cookies?.[TARGET_COOKIE_NAME] || "default";
+  let targetKey = req.cookies?.[TARGET_COOKIE_NAME];
 
   return {
     valid: !!targetServers[targetKey],
@@ -22,7 +22,7 @@ export function targetMiddleware(req, res, next) {
   if (!targetInfo.valid) {
     return res.status(400).json({
       error: "Bad Request",
-      message: targetInfo.error,
+      target: targetInfo.key,
       availableTargets: Object.keys(targetServers),
     });
   }
