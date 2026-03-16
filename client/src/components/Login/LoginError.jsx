@@ -1,4 +1,4 @@
-function LoginError() {
+function LoginError({ target }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-500 via-orange-500 to-pink-500">
       <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
@@ -14,8 +14,11 @@ function LoginError() {
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-gray-800 mb-2">Error de Acceso</h1>
+
           <p className="text-gray-600 mb-6">
-            No se ha especificado un destino válido. Por favor, accede a través de un enlace autorizado.
+            {target
+              ? `El destino '${target}' es inválido`
+              : "No se ha especificado un destino válido. Por favor, accede a través de un enlace autorizado."}
           </p>
         </div>
       </div>

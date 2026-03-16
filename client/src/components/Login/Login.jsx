@@ -3,6 +3,7 @@ import classNames from "classnames";
 import { useSearchParams } from "react-router-dom";
 import { useLabRemAuthentication } from "../../auth/laboratoriosRemotosAuth";
 import LoginError from "./LoginError";
+import targetServers from "../../../../src/targets.json";
 
 function Login() {
   const [searchParams] = useSearchParams();
@@ -13,6 +14,7 @@ function Login() {
   const { mutate: authenticate } = useLabRemAuthentication();
 
   const target = searchParams.get("target");
+  const destination = targetServers[target];
 
   const handleChange = (e) => {
     setFormData({
@@ -33,7 +35,7 @@ function Login() {
     });
   };
 
-  if (!target) return <LoginError />;
+  if (!target || !destination) return <LoginError target={target} />;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500">
