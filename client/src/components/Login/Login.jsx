@@ -1,13 +1,17 @@
 import { useState } from "react";
 import classNames from "classnames";
-import { useLabRemAuthentication } from "../auth/laboratoriosRemotosAuth";
+import { useSearchParams } from "react-router-dom";
+import { useLabRemAuthentication } from "../../auth/laboratoriosRemotosAuth";
 
 function Login() {
+  const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
   const { mutate: authenticate } = useLabRemAuthentication();
+
+  const target = searchParams.get("target");
 
   const handleChange = (e) => {
     setFormData({
@@ -21,9 +25,7 @@ function Login() {
     console.log("Login attempt:", formData);
     authenticate(formData, {
       onSuccess: (data) => {
-        console.log(">>> ", data);
-        // TODO: Don't hardcode labrem target
-        document.cookie = `labrem_target=juanma; path=/; secure`;
+        document.cookie = `labrem_target=${target}; path=/; secure`;
         document.cookie = `labrem_token=${data.token}; path=/; secure`;
         window.location.href = "/";
       },

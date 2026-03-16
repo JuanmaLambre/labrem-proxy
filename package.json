@@ -4,11 +4,9 @@
   "description": "OAuth-protected reverse proxy server for Labrem",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node src/server.js",
+    "dev": "vite build --mode development && node --inspect src/server.js",
     "dev:client": "vite",
-    "build:client": "vite build",
-    "preview": "vite preview"
+    "build:client": "vite build"
   },
   "author": "",
   "license": "MIT",

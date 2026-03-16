@@ -49,7 +49,7 @@ if (fs.existsSync(distPath)) {
 // Serve specific HTML files for different routes
 if (fs.existsSync(distPath)) {
   app.get("/login", (req, res) => {
-    res.sendFile(path.join(distPath, "login.html"));
+    res.sendFile(path.join(distPath, "src/pages/login.html"));
   });
 }
 

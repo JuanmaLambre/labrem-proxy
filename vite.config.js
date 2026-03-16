@@ -13,7 +13,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         // Each entry point will be built separately
-        login: resolve(__dirname, "client/login.html"),
+        login: resolve(__dirname, "client/src/pages/login.html"),
       },
     },
   },
