@@ -1,22 +1,36 @@
+import { Request, Response, NextFunction } from "express";
 import axios from "axios";
-import { cache, fetchTokenCache, setInvalidCache, setTokenCache } from "../auth/cache.js";
-import config from "../config.js";
-import { Shift } from "../../client/src/models/Shift.js";
+import { cache, fetchTokenCache, setInvalidCache, setTokenCache } from "../auth/cache.ts";
+import config from "../config.ts";
+import { Shift } from "../../client/src/models/Shift.ts";
+import "../types/express.ts";
 
 const TOKEN_COOKIE_NAME = "labrem_token";
 
-function extractToken(req) {
+interface ShiftValidation {
+  valid: boolean;
+  message?: string;
+  shifts?: any[];
+}
+
+interface TokenValidation {
+  valid: boolean;
+  message?: string;
+  userInfo?: any;
+}
+
+function extractToken(req: Request): string | undefined {
   return req.cookies?.[TOKEN_COOKIE_NAME];
 }
 
-async function fetchShifts(token) {
+async function fetchShifts(token: string): Promise<ShiftValidation> {
   const response = await axios
     .get(`${config.authenticationUrl}/api/v1/shifts`, {
       headers: { Authorization: `Bearer ${token}` },
     })
     .catch((err) => {
       console.error("Error fetching shifts from LabRem API:", err.message);
-      return { status: err.response?.status || 500 };
+      return { status: err.response?.status || 500, data: null };
     });
 
   if (response.status !== 200) {
@@ -26,20 +40,18 @@ async function fetchShifts(token) {
   return { valid: true, shifts: response.data };
 }
 
-function getActiveShift(shifts, experienceId) {
+function getActiveShift(shifts: Shift[], experienceId: string): Shift | undefined {
   return shifts.find((s) => s.isOpen && s.experienceId === experienceId);
 }
 
-async function validateToken(token, experienceId) {
-  return { valid: true };
-
+async function validateToken(token: string | undefined, experienceId: string): Promise<TokenValidation> {
   if (!token) return { valid: false, message: "Necesita loguearse" };
 
   const cached = fetchTokenCache(token);
   if (cached) {
-    if (!cached.valid) return { valid: false, reason: "Token inválido" };
+    if (!cached.valid) return { valid: false, message: "Token inválido" };
 
-    const shifts = Shift.hydrateAll(cached.shifts);
+    const shifts = Shift.hydrateAll(cached.shifts || []);
     const activeShift = getActiveShift(shifts, experienceId);
 
     if (activeShift) {
@@ -62,7 +74,7 @@ async function validateToken(token, experienceId) {
   }
 
   setTokenCache(token, { shifts: shiftsValidation.shifts });
-  const shifts = Shift.hydrateAll(shiftsValidation.shifts);
+  const shifts = Shift.hydrateAll(shiftsValidation.shifts || []);
   const activeShift = getActiveShift(shifts, experienceId);
 
   if (activeShift) {
@@ -72,9 +84,11 @@ async function validateToken(token, experienceId) {
   }
 }
 
-export async function authMiddleware(req, res, next) {
+export async function authMiddleware(req: Request, res: Response, next: NextFunction): Promise<void | Response> {
   const token = extractToken(req);
-  const validation = await validateToken(token, req.targetServer.key);
+
+  // const validation = await validateToken(token, req.targetServer?.key || "");
+  const validation = { valid: true, message: "" };
 
   if (!validation.valid) {
     return res.status(401).json({

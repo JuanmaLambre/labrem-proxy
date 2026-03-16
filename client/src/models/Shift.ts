@@ -1,11 +1,25 @@
-import { fromJSON } from "postcss";
+interface ShiftJSON {
+  id: number;
+  name: string;
+  day: string;
+  start_time: string;
+  end_time: string;
+  experience_id: string;
+}
 
 export class Shift {
-  static hydrateAll(jsonArray) {
+  id: number;
+  name: string;
+  day: string;
+  startTime: string;
+  endTime: string;
+  experienceId: string;
+
+  static hydrateAll(jsonArray: ShiftJSON[]): Shift[] {
     return jsonArray.map((json) => new Shift(json));
   }
 
-  constructor(json) {
+  constructor(json: ShiftJSON) {
     this.id = json.id;
     this.name = json.name;
     this.day = json.day;
@@ -14,10 +28,10 @@ export class Shift {
     this.experienceId = json.experience_id;
   }
 
-  get isOpen() {
+  get isOpen(): boolean {
     const now = Date.now();
     const startDatetime = new Date(`${this.day}T${this.startTime}`);
     const endDatetime = new Date(`${this.day}T${this.endTime}`);
-    return startDatetime <= now && now <= endDatetime;
+    return startDatetime.getTime() <= now && now <= endDatetime.getTime();
   }
 }

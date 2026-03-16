@@ -1,20 +1,18 @@
 require("dotenv").config();
-const express = require("express");
-const cookieParser = require("cookie-parser");
-const NodeCache = require("node-cache");
-const axios = require("axios");
-const morgan = require("morgan");
-const helmet = require("helmet");
-const https = require("https");
-const http = require("http");
-const fs = require("fs");
-const path = require("path");
-const targetServers = require("./targets.json");
-const { targetMiddleware } = require("./middlewares/targetMiddleware");
-const { authMiddleware } = require("./middlewares/authMiddleware");
-const { proxyMiddleware } = require("./middlewares/proxyMiddleware");
-const { corsMiddleware } = require("./middlewares/corsMiddleware");
-const { default: config } = require("./config");
+import express, { Request, Response } from "express";
+import cookieParser from "cookie-parser";
+import morgan from "morgan";
+import helmet from "helmet";
+import https from "https";
+import http from "http";
+import fs from "fs";
+import path from "path";
+import { default as config } from "./config.ts";
+import targetServers from "./targets.json";
+import { targetMiddleware } from "./middlewares/targetMiddleware.ts";
+import { authMiddleware } from "./middlewares/authMiddleware.ts";
+import { proxyMiddleware } from "./middlewares/proxyMiddleware.ts";
+import { corsMiddleware } from "./middlewares/corsMiddleware.ts";
 
 // Initialize Express app
 const app = express();
@@ -30,7 +28,7 @@ app.use(cookieParser());
 app.use(corsMiddleware);
 
 // Health check endpoint (no auth required)
-app.get("/health", (req, res) => {
+app.get("/health", (req: Request, res: Response) => {
   res.json({
     status: "ok",
     timestamp: new Date().toISOString(),
@@ -53,7 +51,7 @@ if (fs.existsSync(distPath)) {
   });
 }
 
-// Proxy middleware for all other routes routes (must be last)
+// Proxy middleware for all other routes (must be last)
 app.use("*", targetMiddleware, authMiddleware, proxyMiddleware);
 
 // Start server
@@ -97,17 +95,15 @@ function startServer() {
     console.log("=".repeat(60));
     console.log(`Protocol: ${config.httpsEnabled ? "HTTPS" : "HTTP"}`);
     console.log(`Port: ${config.port}`);
-    console.log(`Target Query Param: ?${config.targetQueryParam}=<key>`);
-    console.log(`Default Target: [${config.defaultTarget}] ${targetServers[config.defaultTarget]}`);
     console.log(`Available Targets: ${Object.keys(targetServers).join(", ")}`);
-    console.log(`OAuth Validation URL: ${config.oauthValidationUrl || "NOT CONFIGURED"}`);
+    console.log(`Authentication URL: ${config.authenticationUrl || "NOT CONFIGURED"}`);
     console.log(`Cache TTL: ${config.cacheTtl} seconds`);
     console.log("=".repeat(60));
   });
 }
 
 // Validate configuration
-if (!config.oauthValidationUrl) {
+if (!config.authenticationUrl) {
   console.warn("WARNING: OAUTH_VALIDATION_URL not configured. Set it in .env file");
 }
 

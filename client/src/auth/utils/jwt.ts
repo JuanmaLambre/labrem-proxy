@@ -1,4 +1,4 @@
-export function getExpFromToken(token) {
+export function getExpFromToken(token: string): number | null {
   if (!token) return null;
 
   try {
@@ -11,7 +11,7 @@ export function getExpFromToken(token) {
   }
 }
 
-export function expiredToken(token) {
+export function expiredToken(token: string): boolean {
   const exp = getExpFromToken(token);
   if (!exp) return true;
 
