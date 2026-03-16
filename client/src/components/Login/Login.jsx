@@ -2,6 +2,7 @@ import { useState } from "react";
 import classNames from "classnames";
 import { useSearchParams } from "react-router-dom";
 import { useLabRemAuthentication } from "../../auth/laboratoriosRemotosAuth";
+import LoginError from "./LoginError";
 
 function Login() {
   const [searchParams] = useSearchParams();
@@ -24,13 +25,15 @@ function Login() {
     e.preventDefault();
     console.log("Login attempt:", formData);
     authenticate(formData, {
-      onSuccess: (data) => {
+      onSuccess: (response) => {
         document.cookie = `labrem_target=${target}; path=/; secure`;
-        document.cookie = `labrem_token=${data.token}; path=/; secure`;
+        document.cookie = `labrem_token=${response.data.access_token}; path=/; secure`;
         window.location.href = "/";
       },
     });
   };
+
+  if (!target) return <LoginError />;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500">
