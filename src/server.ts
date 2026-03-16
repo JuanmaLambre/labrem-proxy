@@ -1,58 +1,11 @@
 require("dotenv").config();
-import express, { Request, Response } from "express";
-import cookieParser from "cookie-parser";
-import morgan from "morgan";
-import helmet from "helmet";
 import https from "https";
 import http from "http";
 import fs from "fs";
 import path from "path";
+import { app } from "./app.ts";
 import { default as config } from "./config.ts";
 import targetServers from "./targets.json";
-import { targetMiddleware } from "./middlewares/targetMiddleware.ts";
-import { authMiddleware } from "./middlewares/authMiddleware.ts";
-import { proxyMiddleware } from "./middlewares/proxyMiddleware.ts";
-import { corsMiddleware } from "./middlewares/corsMiddleware.ts";
-
-// Initialize Express app
-const app = express();
-
-// Middlewares
-app.use(
-  helmet({
-    contentSecurityPolicy: false, // Disable CSP for proxy
-  }),
-);
-app.use(morgan(process.env.LOG_LEVEL || "combined"));
-app.use(cookieParser());
-app.use(corsMiddleware);
-
-// Health check endpoint (no auth required)
-app.get("/health", (req: Request, res: Response) => {
-  res.json({
-    status: "ok",
-    timestamp: new Date().toISOString(),
-    targets: targetServers,
-    app: "LabRem proxy",
-  });
-});
-
-// Serve static files from the dist directory (CSS, JS, images)
-const distPath = path.join(__dirname, "../dist");
-if (fs.existsSync(distPath)) {
-  app.use(express.static(distPath));
-  console.log("Serving static files from:", distPath);
-}
-
-// Serve specific HTML files for different routes
-if (fs.existsSync(distPath)) {
-  app.get("/login", (req, res) => {
-    res.sendFile(path.join(distPath, "src/pages/login.html"));
-  });
-}
-
-// Proxy middleware for all other routes (must be last)
-app.use("*", targetMiddleware, authMiddleware, proxyMiddleware);
 
 // Start server
 function startServer() {

@@ -87,8 +87,8 @@ async function validateToken(token: string | undefined, experienceId: string): P
 export async function authMiddleware(req: Request, res: Response, next: NextFunction): Promise<void | Response> {
   const token = extractToken(req);
 
-  // const validation = await validateToken(token, req.targetServer?.key || "");
-  const validation = { valid: true, message: "" };
+  const validation = await validateToken(token, req.targetServer!.key!);
+  // const validation = { valid: true, message: "" };
 
   if (!validation.valid) {
     return res.status(401).json({
