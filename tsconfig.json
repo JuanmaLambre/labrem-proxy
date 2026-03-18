@@ -28,6 +28,6 @@
       "@/*": ["./client/src/*"]
     }
   },
-  "include": ["client/src"],
+  "include": ["client/src", "src/auth/jwt.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

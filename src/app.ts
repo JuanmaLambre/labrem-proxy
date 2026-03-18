@@ -5,7 +5,6 @@ import helmet from "helmet";
 import path from "path";
 import fs from "fs";
 import targetServers from "./targets.json" with { type: "json" };
-import { targetMiddleware } from "./middlewares/targetMiddleware.ts";
 import { authMiddleware } from "./middlewares/authMiddleware.ts";
 import { proxyMiddleware } from "./middlewares/proxyMiddleware.ts";
 import { corsMiddleware } from "./middlewares/corsMiddleware.ts";
@@ -42,10 +41,14 @@ if (fs.existsSync(distPath)) {
 
 // Serve specific HTML files for different routes
 if (fs.existsSync(distPath)) {
-  app.get("/login", (req, res) => {
-    res.sendFile(path.join(distPath, "src/pages/login.html"));
+  app.get("/proxy/espera", (_, res) => {
+    res.sendFile(path.join(distPath, "src/pages/proxy/espera.html"));
+  });
+
+  app.get("/proxy/error", (_, res) => {
+    res.sendFile(path.join(distPath, "src/pages/proxy/error.html"));
   });
 }
 
 // Proxy middleware for all other routes (must be last)
-app.use("*", targetMiddleware, authMiddleware, proxyMiddleware);
+app.use("*", authMiddleware, proxyMiddleware);

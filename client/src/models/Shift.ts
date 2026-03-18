@@ -1,37 +1,48 @@
-interface ShiftJSON {
+import { Experience, ExperienceJSON } from "./Experience";
+
+export interface ShiftJSON {
   id: number;
-  name: string;
-  day: string;
-  start_time: string;
-  end_time: string;
-  experience_id: string;
+  day: string; // yyyy-mm-dd
+  start_time: string; // hh:mm:ss
+  end_time: string; // hh:mm:ss
+  experience: ExperienceJSON;
+  availability: boolean;
 }
 
 export class Shift {
   id: number;
-  name: string;
   day: string;
   startTime: string;
   endTime: string;
-  experienceId: string;
-
-  static hydrateAll(jsonArray: ShiftJSON[]): Shift[] {
-    return jsonArray.map((json) => new Shift(json));
-  }
+  availability: boolean;
+  experience: Experience;
 
   constructor(json: ShiftJSON) {
     this.id = json.id;
-    this.name = json.name;
     this.day = json.day;
     this.startTime = json.start_time;
     this.endTime = json.end_time;
-    this.experienceId = json.experience_id;
+    this.experience = new Experience(json.experience);
+    this.availability = json.availability;
   }
 
   get isOpen(): boolean {
+    if (!this.availability) return false;
+
     const now = Date.now();
     const startDatetime = new Date(`${this.day}T${this.startTime}`);
     const endDatetime = new Date(`${this.day}T${this.endTime}`);
     return startDatetime.getTime() <= now && now <= endDatetime.getTime();
+  }
+
+  toJSON(): ShiftJSON {
+    return {
+      id: this.id,
+      day: this.day,
+      start_time: this.startTime,
+      end_time: this.endTime,
+      availability: this.availability,
+      experience: this.experience.toJSON(),
+    };
   }
 }

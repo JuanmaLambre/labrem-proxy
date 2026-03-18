@@ -2,30 +2,32 @@ import { Request, Response, NextFunction } from "express";
 import axios from "axios";
 import { cache, fetchTokenCache, setInvalidCache, setTokenCache } from "../auth/cache.ts";
 import config from "../config.ts";
-import { Shift } from "../../client/src/models/Shift.ts";
+import { Shift, ShiftJSON } from "../../client/src/models/Shift.ts";
 import "../types/express.ts";
+import { expiredToken, getExpFromToken } from "../auth/jwt.ts";
 
 const TOKEN_COOKIE_NAME = "labrem_token";
 
 interface ShiftValidation {
   valid: boolean;
+  shift?: ShiftJSON;
+  invalid?: boolean; // Must mark token as not valid (false if auth server returns 500)
   message?: string;
-  shifts?: any[];
 }
 
 interface TokenValidation {
   valid: boolean;
   message?: string;
-  userInfo?: any;
+  shift?: Shift;
 }
 
 function extractToken(req: Request): string | undefined {
-  return req.cookies?.[TOKEN_COOKIE_NAME];
+  return req.query.accessToken || req.cookies?.[TOKEN_COOKIE_NAME];
 }
 
-async function fetchShifts(token: string): Promise<ShiftValidation> {
+async function fetchShift(token: string): Promise<ShiftValidation> {
   const response = await axios
-    .get(`${config.authenticationUrl}/api/v1/shifts`, {
+    .get(`${config.authenticationUrl}/api/v1/experiences/shift/info`, {
       headers: { Authorization: `Bearer ${token}` },
     })
     .catch((err) => {
@@ -33,61 +35,73 @@ async function fetchShifts(token: string): Promise<ShiftValidation> {
       return { status: err.response?.status || 500, data: null };
     });
 
-  if (response.status !== 200) {
-    return { valid: false, message: "No se pudieron obtener los turnos asignados" };
+  const statusCode = response.status.toString();
+  if (statusCode.startsWith(4)) {
+    return { invalid: true, valid: false, message: "No se pudieron obtener los turnos asignados" };
+  } else if (statusCode.startsWith(2)) {
+    const details = response.data.assigned_shift.shift_details;
+    const experience = response.data.assigned_shift.experience;
+    const id = response.data.assigned_shift.shift_id;
+
+    return { valid: true, shift: { ...details, id, experience } };
   }
-
-  return { valid: true, shifts: response.data };
+  return { invalid: false, valid: false };
 }
 
-function getActiveShift(shifts: Shift[], experienceId: string): Shift | undefined {
-  return shifts.find((s) => s.isOpen && s.experienceId === experienceId);
-}
-
-async function validateToken(token: string | undefined, experienceId: string): Promise<TokenValidation> {
+async function validateToken(token: string | undefined): Promise<TokenValidation> {
   if (!token) return { valid: false, message: "Necesita loguearse" };
 
+  // TODO: Redirect
+  if (expiredToken(token)) return { valid: false, message: "Experiencia finalizada" };
+
   const cached = fetchTokenCache(token);
-  if (cached) {
+
+  if (cached && !cached.fresh) {
+    console.log("Cache caducado");
+    cache.del(token);
+  } else if (cached) {
     if (!cached.valid) return { valid: false, message: "Token inválido" };
 
-    const shifts = Shift.hydrateAll(cached.shifts || []);
-    const activeShift = getActiveShift(shifts, experienceId);
+    console.log("Cache encontrado");
+    const shift = new Shift(cached.shift!);
 
-    if (activeShift) {
-      return { valid: true, userInfo: cached.userInfo };
+    if (shift.isOpen) {
+      return { valid: true, shift };
     } else if (cached.fresh) {
       return { valid: false, message: "No hay turnos disponibles" };
     }
-
-    // Cache data is considered stale, delete it and revalidate
-    cache.del(token);
   }
 
   // No data in cache, let's fetch it
-  console.log("Token not in cache, validating with LabRem API");
-  const shiftsValidation = await fetchShifts(token);
+  console.log("Validating with LabRem API");
+  const shiftValidation = await fetchShift(token);
 
-  if (!shiftsValidation.valid) {
+  if (shiftValidation.invalid) {
+    console.log("Token invalidado");
     setInvalidCache(token);
-    return { valid: false, message: shiftsValidation.message || "Error al validar el token" };
+    return { valid: false, message: shiftValidation.message || "Error al validar el token" };
   }
 
-  setTokenCache(token, { shifts: shiftsValidation.shifts });
-  const shifts = Shift.hydrateAll(shiftsValidation.shifts || []);
-  const activeShift = getActiveShift(shifts, experienceId);
+  if (!shiftValidation.valid) {
+    console.log("El token no se pudo verificar");
+    return { valid: false, message: "Error de autenticación, vuelva a intentar" };
+  }
 
-  if (activeShift) {
-    return { valid: true };
+  const shift = new Shift(shiftValidation.shift!);
+  setTokenCache(token, { shift: shift.toJSON() });
+
+  if (shift.isOpen) {
+    return { valid: true, shift };
   } else {
-    return { valid: false, message: "No hay turnos disponibles" };
+    // TODO: Redirigir a página de espera
+    return { valid: false, message: "La vacante no está abierta todavía" };
   }
 }
 
 export async function authMiddleware(req: Request, res: Response, next: NextFunction): Promise<void | Response> {
   const token = extractToken(req);
 
-  const validation = await validateToken(token, req.targetServer!.key!);
+  const validation = await validateToken(token);
   // const validation = { valid: true, message: "" };
 
   if (!validation.valid) {
@@ -96,6 +110,9 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
       message: validation.message,
     });
   }
+
+  const maxAge = Math.floor(getExpFromToken(token!)! - Date.now() / 1000);
+  res.cookie(TOKEN_COOKIE_NAME, token, { maxAge });
 
   next();
 }

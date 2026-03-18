@@ -1,13 +1,14 @@
 import NodeCache from "node-cache";
 import config from "../config.ts";
-import { expiredToken } from "../../client/src/auth/utils/jwt.ts";
+import { expiredToken } from "./jwt.ts";
+import { ShiftJSON } from "../../client/src/models/Shift.ts";
 
-const FRESHNESS_THRESHOLD = 10; // Seconds
+const FRESHNESS_THRESHOLD = 60; // Seconds
 
 export interface CachedTokenData {
   timestamp: number;
   valid: boolean;
-  shifts?: any[];
+  shift?: ShiftJSON;
   userInfo?: any;
   exitTime?: number;
   fresh: boolean;
@@ -24,8 +25,6 @@ const cache = new NodeCache({
 
 export function fetchTokenCache(token: string): CachedTokenData | null {
   if (!token) return null;
-
-  if (expiredToken(token)) return null;
 
   const data = cache.get<CachedTokenData>(token);
   if (!data) return null;
