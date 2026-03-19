@@ -1,8 +1,9 @@
 - [x] Si existe un turno para esa experiencia próximamente, redirigir a una página que rediriga a la experiencia ('/') a la hora del turno
 - [ ] Si no hay turnos disponibles para esa experiencia, redirigir a un front bonito que lo comunique.
 - [x] Hacer que targets.json se pueda actualizar dinámicamente sin matar el server
-- [ ] Implement a README
+- [x] Implement a README
 - [ ] Clean up env vars
+- [ ] Configurar CI
 
 TESTS:
 
