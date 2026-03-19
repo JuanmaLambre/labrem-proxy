@@ -10,7 +10,7 @@ const TOKEN_COOKIE_NAME = "labrem_token";
 
 interface ShiftValidation {
   valid: boolean;
-  shift?: ShiftJSON;
+  shift?: Shift;
   invalid?: boolean; // Must mark token as not valid (false if auth server returns 500)
   message?: string;
 }
@@ -19,6 +19,7 @@ interface TokenValidation {
   valid: boolean;
   message?: string;
   shift?: Shift;
+  redirectTo?: string;
 }
 
 function extractToken(req: Request): string | undefined {
@@ -48,12 +49,7 @@ async function fetchShift(token: string): Promise<ShiftValidation> {
   return { invalid: false, valid: false };
 }
 
-async function validateToken(token: string | undefined): Promise<TokenValidation> {
-  if (!token) return { valid: false, message: "Necesita loguearse" };
-
-  // TODO: Redirect
-  if (expiredToken(token)) return { valid: false, message: "Experiencia finalizada" };
-
+async function getShift(token: string): Promise<ShiftValidation> {
   const cached = fetchTokenCache(token);
 
   if (cached && !cached.fresh) {
@@ -74,9 +70,18 @@ async function validateToken(token: string | undefined): Promise<TokenValidation
 
   // No data in cache, let's fetch it
   console.log("Validating with LabRem API");
-  const shiftValidation = await fetchShift(token);
+  return await fetchShift(token);
+}
 
-  if (shiftValidation.invalid) {
+async function validateToken(token: string | undefined): Promise<TokenValidation> {
+  if (!token) return { valid: false, message: "Necesita loguearse" };
+
+  // TODO: Redirect
+  if (expiredToken(token)) return { valid: false, message: "Experiencia finalizada" };
+
+  const { shift, ...shiftValidation } = await getShift(token);
+
+  if (shiftValidation.invalid || !shift) {
     console.log("Token invalidado");
     setInvalidCache(token);
     return { valid: false, message: shiftValidation.message || "Error al validar el token" };
@@ -87,14 +92,15 @@ async function validateToken(token: string | undefined): Promise<TokenValidation
     return { valid: false, message: "Error de autenticación, vuelva a intentar" };
   }
 
-  const shift = new Shift(shiftValidation.shift!);
   setTokenCache(token, { shift: shift.toJSON() });
 
   if (shift.isOpen) {
     return { valid: true, shift };
   } else {
-    // TODO: Redirigir a página de espera
-    return { valid: false, message: "La vacante no está abierta todavía" };
+    const msUntilOpen = new Date(`${shift.day}T${shift.startTime}`).getTime() - Date.now();
+    const name = encodeURIComponent(shift.experience.name);
+    const redirectTo = `/proxy/espera?name=${name}&redirectIn=${msUntilOpen}`;
+    return { valid: true, redirectTo };
   }
 }
 
@@ -113,6 +119,10 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
 
   const maxAge = Math.floor(getExpFromToken(token!)! - Date.now() / 1000);
   res.cookie(TOKEN_COOKIE_NAME, token, { maxAge });
+
+  if (validation.redirectTo) {
+    return res.redirect(validation.redirectTo);
+  }
 
   next();
 }
