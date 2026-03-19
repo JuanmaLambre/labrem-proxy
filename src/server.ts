@@ -5,7 +5,7 @@ import fs from "fs";
 import path from "path";
 import { app } from "./app.ts";
 import { default as config } from "./config.ts";
-import targetServers from "./targets.json";
+import { getTargets } from "./targets.ts";
 
 // Start server
 function startServer() {
@@ -48,7 +48,7 @@ function startServer() {
     console.log("=".repeat(60));
     console.log(`Protocol: ${config.httpsEnabled ? "HTTPS" : "HTTP"}`);
     console.log(`Port: ${config.port}`);
-    console.log(`Available Targets: ${Object.keys(targetServers).join(", ")}`);
+    console.log(`Available Targets: ${Object.keys(getTargets()).join(", ")}`);
     console.log(`Authentication URL: ${config.authenticationUrl || "NOT CONFIGURED"}`);
     console.log(`Cache TTL: ${config.cacheTtl} seconds`);
     console.log("=".repeat(60));

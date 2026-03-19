@@ -1,9 +1,9 @@
+import "../types/express.ts";
 import { Request, Response, NextFunction } from "express";
 import axios from "axios";
 import { cache, fetchTokenCache, setInvalidCache, setTokenCache } from "../auth/cache.ts";
 import config from "../config.ts";
-import { Shift, ShiftJSON } from "../../client/src/models/Shift.ts";
-import "../types/express.ts";
+import { Shift } from "../../client/src/models/Shift.ts";
 import { expiredToken, getExpFromToken } from "../auth/jwt.ts";
 
 const TOKEN_COOKIE_NAME = "labrem_token";

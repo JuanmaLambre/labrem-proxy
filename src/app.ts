@@ -3,7 +3,7 @@ import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import path from "path";
 import fs from "fs";
-import targetServers from "./targets.json" with { type: "json" };
+import { getTargets } from "./targets.ts";
 import { authMiddleware } from "./middlewares/authMiddleware.ts";
 import { proxyMiddleware } from "./middlewares/proxyMiddleware.ts";
 import { corsMiddleware } from "./middlewares/corsMiddleware.ts";
@@ -26,7 +26,7 @@ app.get("/health", (req, res) => {
   res.json({
     status: "ok",
     timestamp: new Date().toISOString(),
-    targets: targetServers,
+    targets: getTargets(),
     app: "LabRem proxy",
   });
 });
