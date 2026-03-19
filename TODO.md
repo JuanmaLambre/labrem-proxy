@@ -2,8 +2,8 @@
 - [ ] Si no hay turnos disponibles para esa experiencia, redirigir a un front bonito que lo comunique.
 - [x] Hacer que targets.json se pueda actualizar dinámicamente sin matar el server
 - [x] Implement a README
-- [ ] Clean up env vars
-- [ ] Configurar CI
+- [x] Clean up env vars
+- [x] Configurar CI
 
 TESTS:
 

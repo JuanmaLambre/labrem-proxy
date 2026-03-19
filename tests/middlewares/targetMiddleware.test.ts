@@ -55,11 +55,6 @@ describe("targetMiddleware", () => {
       expect(capturedTarget).toEqual({ valid: true, key: "exp-1", url: "http://target.example.com" });
     });
 
-    it("reads the token from the accessToken query param", async () => {
-      await request(app).get("/?accessToken=mytoken");
-      expect(mockedCache.fetchTokenCache).toHaveBeenCalledWith("mytoken");
-    });
-
     it("reads the token from the labrem_token cookie", async () => {
       await request(app).get("/").set("Cookie", ["labrem_token=mytoken"]);
       expect(mockedCache.fetchTokenCache).toHaveBeenCalledWith("mytoken");

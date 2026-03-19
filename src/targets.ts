@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import config from "./config";
 
-const targetsPath = path.resolve(config.targetsConfig);
+const targetsPath = path.resolve(config.targetsFilepath);
 
 let targets: Record<string, string> = JSON.parse(fs.readFileSync(targetsPath, "utf-8"));
 

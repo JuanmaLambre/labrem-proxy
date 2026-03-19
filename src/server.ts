@@ -50,7 +50,6 @@ function startServer() {
     console.log(`Port: ${config.port}`);
     console.log(`Available Targets: ${Object.keys(getTargets()).join(", ")}`);
     console.log(`Authentication URL: ${config.authenticationUrl || "NOT CONFIGURED"}`);
-    console.log(`Cache TTL: ${config.cacheTtl} seconds`);
     console.log("=".repeat(60));
   });
 }
