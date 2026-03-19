@@ -38,13 +38,14 @@ async function fetchShift(token: string): Promise<ShiftValidation> {
 
   const statusCode = response.status.toString();
   if (statusCode.startsWith(4)) {
-    return { invalid: true, valid: false, message: "No se pudieron obtener los turnos asignados" };
+    return { invalid: true, valid: false, message: "No se pudo obtener el turno asignado" };
   } else if (statusCode.startsWith(2)) {
     const details = response.data.assigned_shift.shift_details;
     const experience = response.data.assigned_shift.experience;
     const id = response.data.assigned_shift.shift_id;
 
-    return { valid: true, shift: { ...details, id, experience } };
+    const shift = new Shift({ ...details, id, experience });
+    return { valid: true, shift };
   }
   return { invalid: false, valid: false };
 }
@@ -82,8 +83,10 @@ async function validateToken(token: string | undefined): Promise<TokenValidation
   const { shift, ...shiftValidation } = await getShift(token);
 
   if (shiftValidation.invalid || !shift) {
-    console.log("Token invalidado");
-    setInvalidCache(token);
+    if (shiftValidation.invalid) {
+      console.log("Token invalidado");
+      setInvalidCache(token);
+    }
     return { valid: false, message: shiftValidation.message || "Error al validar el token" };
   }
 
@@ -106,9 +109,7 @@ async function validateToken(token: string | undefined): Promise<TokenValidation
 
 export async function authMiddleware(req: Request, res: Response, next: NextFunction): Promise<void | Response> {
   const token = extractToken(req);
-
   const validation = await validateToken(token);
-  // const validation = { valid: true, message: "" };
 
   if (!validation.valid) {
     return res.status(401).json({

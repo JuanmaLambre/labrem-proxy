@@ -4,358 +4,259 @@ import cookieParser from "cookie-parser";
 import axios from "axios";
 import { authMiddleware } from "../../src/middlewares/authMiddleware.ts";
 import * as cache from "../../src/auth/cache.ts";
+import * as jwt from "../../src/auth/jwt.ts";
 
 jest.mock("axios");
 jest.mock("../../src/auth/cache.ts");
+jest.mock("../../src/auth/jwt.ts");
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 const mockedCache = cache as jest.Mocked<typeof cache>;
+const mockedJwt = jwt as jest.Mocked<typeof jwt>;
+
+const TODAY = new Date().toISOString().split("T")[0];
+const TOMORROW = new Date(Date.now() + 86400000).toISOString().split("T")[0];
+
+const openShiftData = {
+  id: 1,
+  day: TODAY,
+  start_time: "00:00:00",
+  end_time: "23:59:59",
+  availability: true,
+  experience: { id: "exp-1", name: "Test Lab", body: "" },
+};
+
+const openApiResponse = {
+  status: 200,
+  data: {
+    assigned_shift: {
+      shift_id: 1,
+      shift_details: { day: TODAY, start_time: "00:00:00", end_time: "23:59:59", availability: true },
+      experience: { id: "exp-1", name: "Test Lab", body: "" },
+    },
+  },
+};
 
 describe("authMiddleware", () => {
   let app: express.Application;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedCache.fetchTokenCache.mockReturnValue(null);
+    mockedJwt.expiredToken.mockReturnValue(false);
+    mockedJwt.getExpFromToken.mockReturnValue(Math.floor(Date.now() / 1000) + 3600);
 
     app = express();
     app.use(cookieParser());
-
-    // Mock request to have targetServer
-    app.use((req, res, next) => {
-      req.targetServer = {
-        valid: true,
-        key: "test-experience",
-        url: "http://test.example.com",
-      };
-      next();
-    });
-
     app.use(authMiddleware);
+    app.use((req, res) => res.json({ success: true }));
+  });
 
-    app.get("/test", (req, res) => {
-      res.json({ success: true });
+  describe("token extraction", () => {
+    it("returns 401 when no token is provided", async () => {
+      const res = await request(app).get("/");
+      expect(res.status).toBe(401);
+      expect(res.body).toEqual({ error: "Unauthorized", message: "Necesita loguearse" });
+    });
+
+    it("reads the token from the accessToken query param", async () => {
+      mockedAxios.get.mockResolvedValue(openApiResponse);
+      await request(app).get("/?accessToken=mytoken");
+      expect(mockedAxios.get).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ headers: { Authorization: "Bearer mytoken" } })
+      );
+    });
+
+    it("reads the token from the labrem_token cookie", async () => {
+      mockedAxios.get.mockResolvedValue(openApiResponse);
+      await request(app).get("/").set("Cookie", ["labrem_token=mytoken"]);
+      expect(mockedAxios.get).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ headers: { Authorization: "Bearer mytoken" } })
+      );
     });
   });
 
-  describe("when no token is present", () => {
-    beforeEach(() => {
-      mockedCache.fetchTokenCache.mockReturnValue(null);
+  describe("when the token is expired", () => {
+    it("returns 401 with expiry message", async () => {
+      mockedJwt.expiredToken.mockReturnValue(true);
+      const res = await request(app).get("/?accessToken=mytoken");
+      expect(res.status).toBe(401);
+      expect(res.body).toEqual({ error: "Unauthorized", message: "Experiencia finalizada" });
     });
 
-    it("should return 401 Unauthorized", async () => {
-      const response = await request(app).get("/test");
-
-      expect(response.status).toBe(401);
-    });
-
-    it("should return error message", async () => {
-      const response = await request(app).get("/test");
-
-      expect(response.body).toHaveProperty("error", "Unauthorized");
-      expect(response.body).toHaveProperty("message");
-    });
-
-    it("should not call next middleware", async () => {
-      const response = await request(app).get("/test");
-
-      expect(response.body).not.toHaveProperty("success");
-    });
-  });
-
-  describe("when token is in cache and valid", () => {
-    beforeEach(() => {
-      mockedCache.fetchTokenCache.mockReturnValue({
-        valid: true,
-        fresh: true,
-        timestamp: Date.now(),
-        shifts: [
-          {
-            id: 1,
-            name: "Test Shift",
-            day: new Date().toISOString().split("T")[0],
-            start_time: "00:00:00",
-            end_time: "23:59:59",
-            experience_id: "test-experience",
-          },
-        ],
-      });
-    });
-
-    it("should return 200 OK", async () => {
-      const response = await request(app)
-        .get("/test")
-        .set("Cookie", ["labrem_token=valid-token"]);
-
-      expect(response.status).toBe(200);
-    });
-
-    it("should call next middleware", async () => {
-      const response = await request(app)
-        .get("/test")
-        .set("Cookie", ["labrem_token=valid-token"]);
-
-      expect(response.body).toHaveProperty("success", true);
-    });
-
-    it("should not call the API", async () => {
-      await request(app)
-        .get("/test")
-        .set("Cookie", ["labrem_token=valid-token"]);
-
+    it("does not call the auth API", async () => {
+      mockedJwt.expiredToken.mockReturnValue(true);
+      await request(app).get("/?accessToken=mytoken");
       expect(mockedAxios.get).not.toHaveBeenCalled();
     });
   });
 
-  describe("when token is in cache but invalid", () => {
-    beforeEach(() => {
-      mockedCache.fetchTokenCache.mockReturnValue({
-        valid: false,
-        fresh: true,
-        timestamp: Date.now(),
-      });
-    });
-
-    it("should return 401 Unauthorized", async () => {
-      const response = await request(app)
-        .get("/test")
-        .set("Cookie", ["labrem_token=invalid-token"]);
-
-      expect(response.status).toBe(401);
-    });
-
-    it("should return error message", async () => {
-      const response = await request(app)
-        .get("/test")
-        .set("Cookie", ["labrem_token=invalid-token"]);
-
-      expect(response.body.message).toBe("Token inválido");
-    });
-  });
-
-  describe("when token is in cache with no active shift", () => {
-    beforeEach(() => {
-      mockedCache.fetchTokenCache.mockReturnValue({
-        valid: true,
-        fresh: true,
-        timestamp: Date.now(),
-        shifts: [
-          {
-            id: 1,
-            name: "Test Shift",
-            day: "2020-01-01", // Past date
-            start_time: "00:00:00",
-            end_time: "23:59:59",
-            experience_id: "test-experience",
-          },
-        ],
-      });
-    });
-
-    it("should return 401 Unauthorized", async () => {
-      const response = await request(app)
-        .get("/test")
-        .set("Cookie", ["labrem_token=token-no-shift"]);
-
-      expect(response.status).toBe(401);
-    });
-
-    it("should return no shifts available message", async () => {
-      const response = await request(app)
-        .get("/test")
-        .set("Cookie", ["labrem_token=token-no-shift"]);
-
-      expect(response.body.message).toBe("No hay turnos disponibles");
-    });
-  });
-
-  describe("when token is not in cache", () => {
-    beforeEach(() => {
-      mockedCache.fetchTokenCache.mockReturnValue(null);
-    });
-
-    describe("and API returns valid shifts", () => {
+  describe("when the token is in a fresh cache", () => {
+    describe("and it is invalid", () => {
       beforeEach(() => {
-        mockedAxios.get.mockResolvedValue({
-          status: 200,
-          data: [
-            {
-              id: 1,
-              name: "Test Shift",
-              day: new Date().toISOString().split("T")[0],
-              start_time: "00:00:00",
-              end_time: "23:59:59",
-              experience_id: "test-experience",
-            },
-          ],
+        mockedCache.fetchTokenCache.mockReturnValue({ valid: false, fresh: true, timestamp: Date.now() });
+      });
+
+      it("returns 401", async () => {
+        const res = await request(app).get("/?accessToken=mytoken");
+        expect(res.status).toBe(401);
+        expect(res.body.message).toBe("Token inválido");
+      });
+
+      it("does not call the auth API", async () => {
+        await request(app).get("/?accessToken=mytoken");
+        expect(mockedAxios.get).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("and the shift is open", () => {
+      beforeEach(() => {
+        mockedCache.fetchTokenCache.mockReturnValue({ valid: true, fresh: true, timestamp: Date.now(), shift: openShiftData });
+      });
+
+      it("calls next middleware", async () => {
+        const res = await request(app).get("/?accessToken=mytoken");
+        expect(res.body).toEqual({ success: true });
+      });
+
+      it("does not call the auth API", async () => {
+        await request(app).get("/?accessToken=mytoken");
+        expect(mockedAxios.get).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("and the shift is not yet open", () => {
+      beforeEach(() => {
+        mockedCache.fetchTokenCache.mockReturnValue({
+          valid: true,
+          fresh: true,
+          timestamp: Date.now(),
+          shift: { ...openShiftData, day: TOMORROW },
         });
       });
 
-      it("should return 200 OK", async () => {
-        const response = await request(app)
-          .get("/test")
-          .set("Cookie", ["labrem_token=new-valid-token"]);
-
-        expect(response.status).toBe(200);
+      it("returns 401 with no shifts available message", async () => {
+        const res = await request(app).get("/?accessToken=mytoken");
+        expect(res.status).toBe(401);
+        expect(res.body.message).toBe("No hay turnos disponibles");
       });
 
-      it("should call the API with correct headers", async () => {
-        await request(app)
-          .get("/test")
-          .set("Cookie", ["labrem_token=new-valid-token"]);
-
-        expect(mockedAxios.get).toHaveBeenCalledWith(
-          expect.stringContaining("/api/v1/shifts"),
-          expect.objectContaining({
-            headers: { Authorization: "Bearer new-valid-token" },
-          })
-        );
-      });
-
-      it("should cache the token", async () => {
-        await request(app)
-          .get("/test")
-          .set("Cookie", ["labrem_token=new-valid-token"]);
-
-        expect(mockedCache.setTokenCache).toHaveBeenCalledWith(
-          "new-valid-token",
-          expect.objectContaining({
-            shifts: expect.any(Array),
-          })
-        );
-      });
-    });
-
-    describe("and API returns error", () => {
-      beforeEach(() => {
-        mockedAxios.get.mockRejectedValue({
-          response: { status: 401 },
-          message: "Unauthorized",
-        });
-      });
-
-      it("should return 401 Unauthorized", async () => {
-        const response = await request(app)
-          .get("/test")
-          .set("Cookie", ["labrem_token=invalid-api-token"]);
-
-        expect(response.status).toBe(401);
-      });
-
-      it("should cache the invalid token", async () => {
-        await request(app)
-          .get("/test")
-          .set("Cookie", ["labrem_token=invalid-api-token"]);
-
-        expect(mockedCache.setInvalidCache).toHaveBeenCalledWith("invalid-api-token");
-      });
-    });
-
-    describe("and API returns valid shifts but none are active", () => {
-      beforeEach(() => {
-        mockedAxios.get.mockResolvedValue({
-          status: 200,
-          data: [
-            {
-              id: 1,
-              name: "Past Shift",
-              day: "2020-01-01",
-              start_time: "00:00:00",
-              end_time: "23:59:59",
-              experience_id: "test-experience",
-            },
-          ],
-        });
-      });
-
-      it("should return 401 Unauthorized", async () => {
-        const response = await request(app)
-          .get("/test")
-          .set("Cookie", ["labrem_token=token-with-inactive-shifts"]);
-
-        expect(response.status).toBe(401);
-      });
-
-      it("should return no shifts available message", async () => {
-        const response = await request(app)
-          .get("/test")
-          .set("Cookie", ["labrem_token=token-with-inactive-shifts"]);
-
-        expect(response.body.message).toBe("No hay turnos disponibles");
-      });
-    });
-
-    describe("and API returns shifts for different experience", () => {
-      beforeEach(() => {
-        mockedAxios.get.mockResolvedValue({
-          status: 200,
-          data: [
-            {
-              id: 1,
-              name: "Other Experience Shift",
-              day: new Date().toISOString().split("T")[0],
-              start_time: "00:00:00",
-              end_time: "23:59:59",
-              experience_id: "other-experience",
-            },
-          ],
-        });
-      });
-
-      it("should return 401 Unauthorized", async () => {
-        const response = await request(app)
-          .get("/test")
-          .set("Cookie", ["labrem_token=token-wrong-experience"]);
-
-        expect(response.status).toBe(401);
+      it("does not call the auth API", async () => {
+        await request(app).get("/?accessToken=mytoken");
+        expect(mockedAxios.get).not.toHaveBeenCalled();
       });
     });
   });
 
-  describe("when cache is stale", () => {
+  describe("when the cache is stale", () => {
     beforeEach(() => {
-      // Mock stale cache (fresh: false)
-      mockedCache.fetchTokenCache.mockReturnValue({
-        valid: true,
-        fresh: false,
-        timestamp: Date.now() - 60000, // 60 seconds ago
-        shifts: [],
-      });
-
-      // Mock cache delete
-      mockedCache.cache = {
-        del: jest.fn(),
-      } as any;
-
-      // Mock API call for revalidation
-      mockedAxios.get.mockResolvedValue({
-        status: 200,
-        data: [
-          {
-            id: 1,
-            name: "Fresh Shift",
-            day: new Date().toISOString().split("T")[0],
-            start_time: "00:00:00",
-            end_time: "23:59:59",
-            experience_id: "test-experience",
-          },
-        ],
-      });
+      mockedCache.fetchTokenCache.mockReturnValue({ valid: true, fresh: false, timestamp: Date.now() - 120000, shift: openShiftData });
+      mockedCache.cache.del = jest.fn();
+      mockedAxios.get.mockResolvedValue(openApiResponse);
     });
 
-    it("should revalidate with API", async () => {
-      await request(app)
-        .get("/test")
-        .set("Cookie", ["labrem_token=stale-token"]);
+    it("deletes the stale cache entry", async () => {
+      await request(app).get("/?accessToken=mytoken");
+      expect(mockedCache.cache.del).toHaveBeenCalledWith("mytoken");
+    });
 
+    it("revalidates with the auth API", async () => {
+      await request(app).get("/?accessToken=mytoken");
       expect(mockedAxios.get).toHaveBeenCalled();
     });
+  });
 
-    it("should delete stale cache", async () => {
-      await request(app)
-        .get("/test")
-        .set("Cookie", ["labrem_token=stale-token"]);
+  describe("when the token is not in cache", () => {
+    it("calls the auth API with the correct endpoint and Bearer token", async () => {
+      mockedAxios.get.mockResolvedValue(openApiResponse);
+      await request(app).get("/?accessToken=mytoken");
+      expect(mockedAxios.get).toHaveBeenCalledWith(
+        expect.stringContaining("/api/v1/experiences/shift/info"),
+        expect.objectContaining({ headers: { Authorization: "Bearer mytoken" } })
+      );
+    });
 
-      expect(mockedCache.cache.del).toHaveBeenCalledWith("stale-token");
+    describe("and the API returns 4xx", () => {
+      beforeEach(() => {
+        mockedAxios.get.mockRejectedValue({ message: "Forbidden", response: { status: 403 } });
+      });
+
+      it("returns 401", async () => {
+        const res = await request(app).get("/?accessToken=mytoken");
+        expect(res.status).toBe(401);
+      });
+
+      it("marks the token as invalid in cache", async () => {
+        await request(app).get("/?accessToken=mytoken");
+        expect(mockedCache.setInvalidCache).toHaveBeenCalledWith("mytoken");
+      });
+    });
+
+    describe("and the API returns 5xx", () => {
+      beforeEach(() => {
+        mockedAxios.get.mockRejectedValue({ message: "Internal Server Error", response: { status: 500 } });
+      });
+
+      it("returns 401", async () => {
+        const res = await request(app).get("/?accessToken=mytoken");
+        expect(res.status).toBe(401);
+      });
+
+      it("does not mark the token as invalid in cache", async () => {
+        await request(app).get("/?accessToken=mytoken");
+        expect(mockedCache.setInvalidCache).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("and the API returns an open shift", () => {
+      beforeEach(() => {
+        mockedAxios.get.mockResolvedValue(openApiResponse);
+      });
+
+      it("calls next middleware", async () => {
+        const res = await request(app).get("/?accessToken=mytoken");
+        expect(res.body).toEqual({ success: true });
+      });
+
+      it("caches the token", async () => {
+        await request(app).get("/?accessToken=mytoken");
+        expect(mockedCache.setTokenCache).toHaveBeenCalledWith("mytoken", expect.objectContaining({ shift: expect.any(Object) }));
+      });
+
+      it("sets the labrem_token cookie", async () => {
+        const res = await request(app).get("/?accessToken=mytoken");
+        expect(res.headers["set-cookie"]).toEqual(
+          expect.arrayContaining([expect.stringContaining("labrem_token=mytoken")])
+        );
+      });
+    });
+
+    describe("and the API returns a shift not yet open", () => {
+      beforeEach(() => {
+        mockedAxios.get.mockResolvedValue({
+          status: 200,
+          data: {
+            assigned_shift: {
+              shift_id: 1,
+              shift_details: { day: TOMORROW, start_time: "00:00:00", end_time: "23:59:59", availability: true },
+              experience: { id: "exp-1", name: "Test Lab", body: "" },
+            },
+          },
+        });
+      });
+
+      it("redirects to /proxy/espera with name and redirectIn", async () => {
+        const res = await request(app).get("/?accessToken=mytoken");
+        expect(res.status).toBe(302);
+        expect(res.headers.location).toMatch(/^\/proxy\/espera\?name=Test%20Lab&redirectIn=\d+$/);
+      });
+
+      it("caches the token", async () => {
+        await request(app).get("/?accessToken=mytoken");
+        expect(mockedCache.setTokenCache).toHaveBeenCalled();
+      });
     });
   });
 });

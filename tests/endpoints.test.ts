@@ -3,7 +3,7 @@ import { app } from "../src/app.ts";
 
 describe("Server Endpoints", () => {
   describe("GET /health", () => {
-    it("should return status ok", async () => {
+    it("returns status ok", async () => {
       const response = await request(app).get("/health");
 
       expect(response.status).toBe(200);
@@ -13,16 +13,16 @@ describe("Server Endpoints", () => {
       expect(response.body).toHaveProperty("app", "LabRem proxy");
     });
 
-    it("should return JSON content-type", async () => {
+    it("returns JSON content-type", async () => {
       const response = await request(app).get("/health");
 
       expect(response.headers["content-type"]).toMatch(/json/);
     });
   });
 
-  describe("GET /login", () => {
-    it("should return the login page HTML", async () => {
-      const response = await request(app).get("/login");
+  describe("GET /proxy/espera", () => {
+    it("returns the waiting page HTML", async () => {
+      const response = await request(app).get("/proxy/espera");
 
       expect(response.status).toBe(200);
       expect(response.headers["content-type"]).toMatch(/html/);

@@ -1,6 +1,5 @@
 import express from "express";
 import cookieParser from "cookie-parser";
-import morgan from "morgan";
 import helmet from "helmet";
 import path from "path";
 import fs from "fs";
@@ -18,7 +17,7 @@ app.use(
     contentSecurityPolicy: false, // Disable CSP for proxy
   }),
 );
-app.use(morgan(process.env.LOG_LEVEL || "combined"));
+
 app.use(cookieParser());
 app.use(corsMiddleware);
 
