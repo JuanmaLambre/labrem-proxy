@@ -9,6 +9,9 @@ jest.mock("../../src/auth/jwt.ts");
 jest.mock("../../src/middlewares/proxyMiddleware.ts", () => ({
   proxyMiddleware: (req: any, res: any) => res.status(200).json({ proxied: true }),
 }));
+jest.mock("../../src/middlewares/targetMiddleware.ts", () => ({
+  targetMiddleware: (req: any, res: any, next: any) => next(),
+}));
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 

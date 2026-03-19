@@ -7,7 +7,7 @@ export interface TargetInfo {
 declare global {
   namespace Express {
     interface Request {
-      targetServer?: TargetInfo;
+      target?: TargetInfo;
     }
   }
 }

@@ -8,7 +8,7 @@ const rewriteLocationHeader = (proxyRes: IncomingMessage, req: Request): void =>
   // Rewrite Location headers in redirect responses to prevent browser from navigating away
   const location = proxyRes.headers["location"];
   if (location) {
-    const targetUrl = req.targetServer!.url!;
+    const targetUrl = req.target!.url!;
     const locationUrl = new URL(location, targetUrl);
     const targetUrlObj = new URL(targetUrl);
 
@@ -31,12 +31,12 @@ const rewriteLocationHeader = (proxyRes: IncomingMessage, req: Request): void =>
 
 // Proxy middleware configuration with dynamic target routing
 const proxyOptions: Options = {
-  router: (req: Request) => req.targetServer!.url,
+  router: (req: Request) => req.target!.url,
   changeOrigin: true,
   ws: true, // Proxy websockets
   onProxyRes: rewriteLocationHeader,
   onError: (err: Error, req: Request, res: Response) => {
-    const targetKey = req.targetServer!.key;
+    const targetKey = req.target!.key;
     console.error(`Proxy error for target [${targetKey}]:`, err.message);
     res.status(502).json({
       error: "Bad Gateway",
