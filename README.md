@@ -74,3 +74,33 @@ npm test
 # Modo watch
 npm run test:watch
 ```
+
+### Debugging
+
+**1. Correr un archivo de test específico**
+
+```bash
+npx jest tests/middlewares/authMiddleware.test.ts
+```
+
+**2. Salida detallada (verbose) y con logs visibles**
+
+El config tiene `silent: true` que suprime los `console.log`. Para ver la salida completa:
+
+```bash
+npx jest --verbose --silent=false tests/middlewares/authMiddleware.test.ts
+```
+
+**3. Correr solo un test por nombre**
+
+```bash
+npx jest --testNamePattern="nombre del test"
+```
+
+**4. Debugger de Node (para usar breakpoints)**
+
+```bash
+node --inspect-brk ./node_modules/.bin/jest --runInBand tests/middlewares/authMiddleware.test.ts
+```
+
+Luego abrir `chrome://inspect` en Chrome y conectarse al proceso. El flag `--runInBand` es necesario para que los tests corran en el mismo proceso que el debugger. Al abrir la console de debug se frena automáticamente la ejecución, pero de todas maneras se puede poner un breakpoint en el código agregando la línea `debugger;`
