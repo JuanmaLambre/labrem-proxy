@@ -26,13 +26,7 @@ npm run dev
 
 El servidor queda disponible en `http://localhost:3456` por defecto.
 
-Para cambiar el puerto u otras opciones, crear un archivo `.env` en la raíz del proyecto:
-
-```env
-PORT=3456
-AUTHENTICATION_URL=https://laboratorios-remotos-test.fi.uba.ar
-CACHE_TTL_SECONDS=300
-```
+Para cambiar el puerto u otras opciones, crear un archivo `.env` en la raíz del proyecto.
 
 ---
 
@@ -50,6 +44,13 @@ npm start
 - `dist-server/` — servidor compilado a JavaScript
 
 > En producción el archivo `dist-server/src/targets.json` puede editarse en caliente sin reiniciar el servidor (ver [Configuración de targets](#configuración-de-targets)).
+
+### Scripts de inicio y monitoreo
+
+- **`scripts/start.sh`** — verifica el entorno (Node.js, `.env`, `targets.json`, certificados SSL, dependencias) e inicia el servidor en segundo plano. Registra el watchdog como cron job si no existe.
+- **`scripts/watchdog.sh`** — ejecutado por cron cada 5 minutos; consulta `/health` y reinicia el servidor automáticamente si no responde.
+
+Estos scripts están pensados para ser corridos en producción.
 
 ---
 
