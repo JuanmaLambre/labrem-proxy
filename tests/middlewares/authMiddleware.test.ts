@@ -14,8 +14,15 @@ const mockedAxios = axios as jest.Mocked<typeof axios>;
 const mockedCache = cache as jest.Mocked<typeof cache>;
 const mockedJwt = jwt as jest.Mocked<typeof jwt>;
 
-const TODAY = new Date().toISOString().split("T")[0];
-const TOMORROW = new Date(Date.now() + 86400000).toISOString().split("T")[0];
+function dateToString(date: Date): string {
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const day = date.getDate().toString().padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+const TODAY = dateToString(new Date());
+const TOMORROW = dateToString(new Date(Date.now() + 24 * 60 * 60 * 1000));
 
 const openShiftData = {
   id: 1,
@@ -64,7 +71,7 @@ describe("authMiddleware", () => {
       await request(app).get("/?accessToken=mytoken");
       expect(mockedAxios.get).toHaveBeenCalledWith(
         expect.any(String),
-        expect.objectContaining({ headers: { Authorization: "Bearer mytoken" } })
+        expect.objectContaining({ headers: { Authorization: "Bearer mytoken" } }),
       );
     });
 
@@ -73,7 +80,7 @@ describe("authMiddleware", () => {
       await request(app).get("/").set("Cookie", ["labrem_token=mytoken"]);
       expect(mockedAxios.get).toHaveBeenCalledWith(
         expect.any(String),
-        expect.objectContaining({ headers: { Authorization: "Bearer mytoken" } })
+        expect.objectContaining({ headers: { Authorization: "Bearer mytoken" } }),
       );
     });
   });
@@ -113,7 +120,12 @@ describe("authMiddleware", () => {
 
     describe("and the shift is open", () => {
       beforeEach(() => {
-        mockedCache.fetchTokenCache.mockReturnValue({ valid: true, fresh: true, timestamp: Date.now(), shift: openShiftData });
+        mockedCache.fetchTokenCache.mockReturnValue({
+          valid: true,
+          fresh: true,
+          timestamp: Date.now(),
+          shift: openShiftData,
+        });
       });
 
       it("calls next middleware", async () => {
@@ -152,7 +164,12 @@ describe("authMiddleware", () => {
 
   describe("when the cache is stale", () => {
     beforeEach(() => {
-      mockedCache.fetchTokenCache.mockReturnValue({ valid: true, fresh: false, timestamp: Date.now() - 120000, shift: openShiftData });
+      mockedCache.fetchTokenCache.mockReturnValue({
+        valid: true,
+        fresh: false,
+        timestamp: Date.now() - 120000,
+        shift: openShiftData,
+      });
       mockedCache.cache.del = jest.fn();
       mockedAxios.get.mockResolvedValue(openApiResponse);
     });
@@ -174,7 +191,7 @@ describe("authMiddleware", () => {
       await request(app).get("/?accessToken=mytoken");
       expect(mockedAxios.get).toHaveBeenCalledWith(
         expect.stringContaining("/api/v1/experiences/shift/info"),
-        expect.objectContaining({ headers: { Authorization: "Bearer mytoken" } })
+        expect.objectContaining({ headers: { Authorization: "Bearer mytoken" } }),
       );
     });
 
@@ -222,13 +239,16 @@ describe("authMiddleware", () => {
 
       it("caches the token", async () => {
         await request(app).get("/?accessToken=mytoken");
-        expect(mockedCache.setTokenCache).toHaveBeenCalledWith("mytoken", expect.objectContaining({ shift: expect.any(Object) }));
+        expect(mockedCache.setTokenCache).toHaveBeenCalledWith(
+          "mytoken",
+          expect.objectContaining({ shift: expect.any(Object) }),
+        );
       });
 
       it("sets the labrem_token cookie", async () => {
         const res = await request(app).get("/?accessToken=mytoken");
         expect(res.headers["set-cookie"]).toEqual(
-          expect.arrayContaining([expect.stringContaining("labrem_token=mytoken")])
+          expect.arrayContaining([expect.stringContaining("labrem_token=mytoken")]),
         );
       });
     });
