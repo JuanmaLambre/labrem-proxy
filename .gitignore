@@ -6,9 +6,10 @@ logs/
 .DS_Store
 npm-debug.log*
 
-# Frontend build
+# Builds
 dist/
+dist-server/
 
 # Keep example files but ignore actual config
-targets.json
+src/targets.json
 !targets.json.example

@@ -14,6 +14,9 @@ Servidor proxy inverso con autenticación OAuth para [LabRem](https://laboratori
 ## Instalación y ejecución local
 
 ```bash
+# Generar el archivo targets.json
+echo '{}' > src/targets.json
+
 # Instalar dependencias
 npm install
 

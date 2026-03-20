@@ -7,6 +7,17 @@ on:
     branches: [main]
 
 jobs:
+  debugger-statements:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check for debugger statements
+        run: |
+          if grep -rn --include="*.ts" --include="*.js" "debugger" src tests; then
+            echo "Error: debugger; statements found"
+            exit 1
+          fi
+
   test:
     runs-on: ubuntu-latest
 
@@ -21,13 +32,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Check for debugger statements
-        run: |
-          if grep -rn --include="*.ts" --include="*.js" "debugger;" src tests; then
-            echo "Error: debugger; statements found"
-            exit 1
-          fi
 
       - name: Run tests
         run: npm test
