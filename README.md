@@ -69,6 +69,30 @@ El servidor detecta cambios en este archivo automáticamente y recarga la config
 
 ---
 
+## Deploy
+
+El servidor de producción no tiene acceso libre a internet, por lo que no es posible correr `npm install` directamente en él. El script `scripts/deploy.sh` resuelve esto construyendo el proyecto localmente para Linux x86_64 y transfiriéndolo al servidor.
+
+```bash
+bash scripts/deploy.sh
+```
+
+El script:
+
+1. Instala las dependencias para la plataforma Linux x86_64.
+2. Empaqueta el proyecto (archivos del repositorio + `node_modules`) en un archivo `.zip`.
+3. Sube el archivo al servidor vía `scp`.
+
+> Requiere estar conectado a la VPN y tener acceso SSH al servidor.
+
+Una vez dentro del servidor se puede ejecutar el siguiente comando para unzippear
+
+```bash
+unzip -o labrem-proxy-*.zip -d labrem-proxy
+```
+
+---
+
 ## Tests
 
 ```bash
