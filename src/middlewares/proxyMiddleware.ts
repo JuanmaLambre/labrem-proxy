@@ -1,9 +1,12 @@
 import { Request, Response } from "express";
 import { createProxyMiddleware, Options } from "http-proxy-middleware";
 import { IncomingMessage } from "http";
+import { HttpsProxyAgent } from "https-proxy-agent";
 import config from "../config.ts";
 import "../types/express.ts";
-import { extractToken, TOKEN_COOKIE_NAME } from "./utils.ts";
+import { buildTokenCookie, extractToken, TOKEN_COOKIE_NAME } from "./utils.ts";
+
+const upstreamProxy = config.upstreamProxy ? new HttpsProxyAgent(config.upstreamProxy) : undefined;
 
 const rewriteLocationHeader = (proxyRes: IncomingMessage, req: Request): void => {
   // Rewrite Location headers in redirect responses to prevent browser from navigating away
@@ -31,10 +34,10 @@ const rewriteLocationHeader = (proxyRes: IncomingMessage, req: Request): void =>
 };
 
 function conserveTokenCookie(proxyRes: IncomingMessage, req: Request): void {
-  const existing = proxyRes.headers["set-cookie"] || [];
-  const token = extractToken(req);
-  const tokenCookie = `${TOKEN_COOKIE_NAME}=${token};`;
-  proxyRes.headers["set-cookie"] = [...existing, tokenCookie];
+  const existing = (proxyRes.headers["set-cookie"] as string[] | undefined) || [];
+  const tokenCookie = buildTokenCookie(req);
+  const filtered = existing.filter((c) => !c.toLowerCase().startsWith(`${TOKEN_COOKIE_NAME.toLowerCase()}=`));
+  proxyRes.headers["set-cookie"] = [...filtered, tokenCookie];
 }
 
 function onProxyRes(proxyRes: IncomingMessage, req: Request) {
@@ -46,6 +49,7 @@ function onProxyRes(proxyRes: IncomingMessage, req: Request) {
 const proxyOptions: Options = {
   router: (req: Request) => req.target!.url,
   changeOrigin: true,
+  ...(upstreamProxy && { agent: upstreamProxy }),
   ws: true, // Proxy websockets
   onProxyRes,
   onError: (err: Error, req: Request, res: Response) => {

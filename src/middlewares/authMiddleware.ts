@@ -4,8 +4,8 @@ import axios from "axios";
 import { cache, fetchTokenCache, setInvalidCache, setTokenCache } from "../auth/cache.ts";
 import config from "../config.ts";
 import { Shift } from "../../client/src/models/Shift.ts";
-import { expiredToken, getExpFromToken } from "../auth/jwt.ts";
-import { extractToken, TOKEN_COOKIE_NAME } from "./utils.ts";
+import { expiredToken } from "../auth/jwt.ts";
+import { extractToken } from "./utils.ts";
 
 interface ShiftValidation {
   valid: boolean;
@@ -112,9 +112,6 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
       message: validation.message,
     });
   }
-
-  const maxAge = Math.floor(getExpFromToken(token!)! - Date.now() / 1000);
-  res.cookie(TOKEN_COOKIE_NAME, token, { maxAge });
 
   if (validation.redirectTo) {
     return res.redirect(validation.redirectTo);

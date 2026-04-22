@@ -7,6 +7,7 @@ const config = {
   sslKeyPath: process.env.SSL_KEY_PATH,
   sslCertPath: process.env.SSL_CERT_PATH,
   targetsFilepath: process.env.TARGETS_CONFIG || "targets.json",
+  upstreamProxy: process.env.HTTPS_PROXY || process.env.HTTP_PROXY,
 } as const;
 
 export default config;
