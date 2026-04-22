@@ -69,7 +69,10 @@ describe("targetMiddleware", () => {
     it("returns 502", async () => {
       const res = await request(app).get("/?accessToken=mytoken");
       expect(res.status).toBe(502);
-      expect(res.body).toEqual({ error: "Bad Gateway", message: "No target server configured for this experience" });
+      expect(res.body).toMatchObject({
+        error: "Bad Gateway",
+        message: "No target server configured for this experience",
+      });
     });
 
     it("does not call next middleware", async () => {

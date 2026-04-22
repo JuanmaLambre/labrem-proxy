@@ -4,10 +4,10 @@
   "description": "OAuth-protected reverse proxy server for Labrem",
   "main": "src/server.js",
   "scripts": {
-    "start": "vite build && tsx src/server.js",
+    "start": "tsx src/server.js",
+    "build": "vite build",
     "dev": "vite build --mode development && tsx --inspect src/server.js",
     "dev:client": "vite",
-    "build:client": "vite build",
     "test": "vite build && jest",
     "test:watch": "jest --watch"
   },

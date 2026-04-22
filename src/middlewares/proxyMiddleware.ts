@@ -3,6 +3,7 @@ import { createProxyMiddleware, Options } from "http-proxy-middleware";
 import { IncomingMessage } from "http";
 import config from "../config.ts";
 import "../types/express.ts";
+import { extractToken, TOKEN_COOKIE_NAME } from "./utils.ts";
 
 const rewriteLocationHeader = (proxyRes: IncomingMessage, req: Request): void => {
   // Rewrite Location headers in redirect responses to prevent browser from navigating away
@@ -29,12 +30,24 @@ const rewriteLocationHeader = (proxyRes: IncomingMessage, req: Request): void =>
   }
 };
 
+function conserveTokenCookie(proxyRes: IncomingMessage, req: Request): void {
+  const existing = proxyRes.headers["set-cookie"] || [];
+  const token = extractToken(req);
+  const tokenCookie = `${TOKEN_COOKIE_NAME}=${token};`;
+  proxyRes.headers["set-cookie"] = [...existing, tokenCookie];
+}
+
+function onProxyRes(proxyRes: IncomingMessage, req: Request) {
+  rewriteLocationHeader(proxyRes, req);
+  conserveTokenCookie(proxyRes, req);
+}
+
 // Proxy middleware configuration with dynamic target routing
 const proxyOptions: Options = {
   router: (req: Request) => req.target!.url,
   changeOrigin: true,
   ws: true, // Proxy websockets
-  onProxyRes: rewriteLocationHeader,
+  onProxyRes,
   onError: (err: Error, req: Request, res: Response) => {
     const targetKey = req.target!.key;
     console.error(`Proxy error for target [${targetKey}]:`, err.message);

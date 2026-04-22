@@ -5,8 +5,7 @@ import { cache, fetchTokenCache, setInvalidCache, setTokenCache } from "../auth/
 import config from "../config.ts";
 import { Shift } from "../../client/src/models/Shift.ts";
 import { expiredToken, getExpFromToken } from "../auth/jwt.ts";
-
-const TOKEN_COOKIE_NAME = "labrem_token";
+import { extractToken, TOKEN_COOKIE_NAME } from "./utils.ts";
 
 interface ShiftValidation {
   valid: boolean;
@@ -20,10 +19,6 @@ interface TokenValidation {
   message?: string;
   shift?: Shift;
   redirectTo?: string;
-}
-
-function extractToken(req: Request): string | undefined {
-  return req.query.accessToken || req.cookies?.[TOKEN_COOKIE_NAME];
 }
 
 async function fetchShift(token: string): Promise<ShiftValidation> {
