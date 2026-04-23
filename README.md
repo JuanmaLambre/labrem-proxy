@@ -32,18 +32,39 @@ Para cambiar el puerto u otras opciones, crear un archivo `.env` en la raíz del
 
 ## Ejecución en producción
 
-```bash
-npm install
+El servidor se gestiona con [PM2](https://pm2.keymetrics.io/), que lo mantiene corriendo y lo reinicia automáticamente si se cae.
 
-npm start
+**Primera vez en el servidor:**
+
+```bash
+npm install -g pm2
+bash scripts/start.sh
+
+# Registrar PM2 para que arranque automáticamente con el sistema
+pm2 startup   # ejecutar el comando que imprime
+pm2 save
 ```
 
-`npm run build` genera dos artefactos:
+**Deploys posteriores** (luego de transferir y descomprimir el zip):
 
-- `dist/` — cliente React compilado (páginas estáticas servidas por el proxy)
-- `dist-server/` — servidor compilado a JavaScript
+```bash
+bash scripts/start.sh
+```
 
-> En producción el archivo `dist-server/src/targets.json` puede editarse en caliente sin reiniciar el servidor (ver [Configuración de targets](#configuración-de-targets)).
+El script valida el entorno (`.env`, `targets.json`, certificados SSL, dependencias, build del cliente) y luego hace `pm2 start` o `pm2 restart` según corresponda.
+
+**Comandos útiles:**
+
+```bash
+pm2 status                  # estado del proceso
+pm2 logs labrem-proxy       # logs en tiempo real
+pm2 restart labrem-proxy    # reinicio manual
+pm2 stop labrem-proxy       # detener sin eliminar
+```
+
+`npm run build` genera `dist/` con el cliente React compilado (páginas estáticas servidas por el proxy).
+
+> El archivo `targets.json` puede editarse en caliente sin reiniciar el servidor (ver [Configuración de targets](#configuración-de-targets)).
 
 ## Configuración de targets
 
