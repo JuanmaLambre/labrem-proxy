@@ -16,6 +16,15 @@ if [[ -z "$SSH_USER" ]]; then
   exit 1
 fi
 
+CONTROL_SOCKET=$(mktemp -u /tmp/ssh-ctl-XXXXXX)
+SSH_OPTS=(
+  -o StrictHostKeyChecking=accept-new
+  -o ControlPath="$CONTROL_SOCKET"
+  -o ControlMaster=auto
+  -o ControlPersist=yes
+)
+trap 'ssh "${SSH_OPTS[@]}" -O exit "$SSH_USER@$TARGET_HOST" 2>/dev/null; true' EXIT
+
 cd "$PROJECT_ROOT"
 
 echo Zipping files...
@@ -23,7 +32,6 @@ zip -r "$ARCHIVE_PATH" $(git ls-files)
 echo "Archive created: $ARCHIVE_PATH ($(du -sh "$ARCHIVE_PATH" | cut -f1))"
 
 echo "Uploading to $SSH_USER@$TARGET_HOST:$DEST_PATH ..."
-SSH_OPTS=(-o StrictHostKeyChecking=accept-new)
 scp "${SSH_OPTS[@]}" "$ARCHIVE_PATH" "$SSH_USER@$TARGET_HOST:$DEST_PATH"
 echo Uploaded
 
