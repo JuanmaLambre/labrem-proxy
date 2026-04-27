@@ -3,6 +3,7 @@ import axios from "axios";
 import { app } from "../../src/app.ts";
 import { cache } from "../../src/auth/cache.ts";
 import * as mockedJwt from "../../src/auth/jwt.ts";
+import { beforeEach } from "mocha";
 
 jest.mock("axios");
 jest.mock("../../src/auth/jwt.ts");

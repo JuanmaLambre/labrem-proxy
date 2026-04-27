@@ -4,7 +4,7 @@ import { IncomingMessage } from "http";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import config from "../config.ts";
 import "../types/express.ts";
-import { buildTokenCookie, extractToken, TOKEN_COOKIE_NAME } from "./utils.ts";
+import { buildTokenCookie, TOKEN_COOKIE_NAME } from "./utils.ts";
 
 const upstreamProxy = config.upstreamProxy ? new HttpsProxyAgent(config.upstreamProxy) : undefined;
 
