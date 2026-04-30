@@ -33,7 +33,8 @@ async function fetchShift(token: string): Promise<ShiftValidation> {
 
   const statusCode = response.status.toString();
   if (statusCode.startsWith(4)) {
-    return { invalid: true, valid: false, message: "No se pudo obtener el turno asignado" };
+    const { message } = response.data;
+    return { invalid: true, valid: false, message: `No se pudo obtener el turno asignado: ${message ?? ""}` };
   } else if (statusCode.startsWith(2)) {
     const details = response.data.assigned_shift.shift_details;
     const experience = response.data.assigned_shift.experience;
