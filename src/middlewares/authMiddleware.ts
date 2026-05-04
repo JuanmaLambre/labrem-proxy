@@ -33,12 +33,14 @@ async function fetchShift(token: string): Promise<ShiftValidation> {
 
   const statusCode = response.status.toString();
   if (statusCode.startsWith(4)) {
-    const { message } = response.data;
-    return { invalid: true, valid: false, message: `No se pudo obtener el turno asignado: ${message ?? ""}` };
+    const message = response.data?.message;
+    return {
+      invalid: true,
+      valid: false,
+      message: `No se pudo obtener el turno asignado${message ? `: ${message}` : ""}`,
+    };
   } else if (statusCode.startsWith(2)) {
-    const details = response.data.assigned_shift.shift_details;
-    const experience = response.data.assigned_shift.experience;
-    const id = response.data.assigned_shift.shift_id;
+    const { shift_details: details, experience, shift_id: id } = response.data.assignments;
 
     const shift = new Shift({ ...details, id, experience });
     return { valid: true, shift };

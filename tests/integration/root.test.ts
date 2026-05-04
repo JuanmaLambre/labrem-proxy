@@ -3,7 +3,6 @@ import axios from "axios";
 import { app } from "../../src/app.ts";
 import { cache } from "../../src/auth/cache.ts";
 import * as mockedJwt from "../../src/auth/jwt.ts";
-import { beforeEach } from "mocha";
 
 jest.mock("axios");
 jest.mock("../../src/auth/jwt.ts");
@@ -76,7 +75,7 @@ describe("End-to-end tests", () => {
         const openShift = {
           status: 200,
           data: {
-            assigned_shift: {
+            assignments: {
               shift_id: 1,
               shift_details: { day: TODAY, start_time: "00:00:00", end_time: "23:59:59", availability: true },
               experience: { id: "exp-1", name: "Test Lab", body: "" },
@@ -103,7 +102,7 @@ describe("End-to-end tests", () => {
       mockedAxios.get.mockResolvedValue({
         status: 200,
         data: {
-          assigned_shift: {
+          assignments: {
             shift_id: 1,
             shift_details: { day: tomorrow, start_time: "00:00:00", end_time: "23:59:59", availability: true },
             experience: { id: "exp-1", name: "Test Lab", body: "" },
@@ -126,7 +125,7 @@ describe("End-to-end tests", () => {
       mockedAxios.get.mockResolvedValue({
         status: 200,
         data: {
-          assigned_shift: {
+          assignments: {
             shift_id: 1,
             shift_details: { day: TODAY, start_time: "00:00:00", end_time: "23:59:59", availability: true },
             experience: { id: "exp-1", name: "Test Lab", body: "" },

@@ -36,7 +36,7 @@ const openShiftData = {
 const openApiResponse = {
   status: 200,
   data: {
-    assigned_shift: {
+    assignments: {
       shift_id: 1,
       shift_details: { day: TODAY, start_time: "00:00:00", end_time: "23:59:59", availability: true },
       experience: { id: "exp-1", name: "Test Lab", body: "" },
@@ -258,7 +258,7 @@ describe("authMiddleware", () => {
         mockedAxios.get.mockResolvedValue({
           status: 200,
           data: {
-            assigned_shift: {
+            assignments: {
               shift_id: 1,
               shift_details: { day: TOMORROW, start_time: "00:00:00", end_time: "23:59:59", availability: true },
               experience: { id: "exp-1", name: "Test Lab", body: "" },
