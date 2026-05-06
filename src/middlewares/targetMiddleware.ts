@@ -4,10 +4,7 @@ import { getTargets } from "../targets.ts";
 import "../types/express.ts";
 import { extractToken } from "./utils.ts";
 
-export function targetMiddleware(req: Request, res: Response, next: NextFunction): void | Response {
-  const token = extractToken(req);
-  const cached = fetchTokenCache(token!);
-  const experienceId = cached?.shift?.experience?.id;
+export function setTarget(req: Request, res: Response, experienceId?: string) {
   const targetUrl = getTargets()[experienceId!];
 
   if (!targetUrl) {
@@ -18,6 +15,15 @@ export function targetMiddleware(req: Request, res: Response, next: NextFunction
     });
   }
 
-  req.target = { valid: true, key: experienceId!, url: targetUrl };
+  req.target = { valid: true, key: experienceId, url: targetUrl };
+}
+
+export function targetMiddleware(req: Request, res: Response, next: NextFunction): void | Response {
+  const token = extractToken(req);
+  const cached = fetchTokenCache(token!);
+  const experienceId = cached?.shift?.experience?.id;
+
+  setTarget(req, res, experienceId);
+
   next();
 }

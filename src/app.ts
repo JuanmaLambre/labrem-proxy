@@ -8,6 +8,7 @@ import { authMiddleware } from "./middlewares/authMiddleware.ts";
 import { targetMiddleware } from "./middlewares/targetMiddleware.ts";
 import { proxyMiddleware } from "./middlewares/proxyMiddleware.ts";
 import { corsMiddleware } from "./middlewares/corsMiddleware.ts";
+import { testMiddleware } from "./middlewares/testMiddleware.ts";
 
 // Initialize Express app
 export const app = express();
@@ -51,4 +52,4 @@ if (fs.existsSync(distPath)) {
 }
 
 // Proxy middleware for all other routes (must be last)
-app.use("*", authMiddleware, targetMiddleware, proxyMiddleware);
+app.use("*", testMiddleware, authMiddleware, targetMiddleware, proxyMiddleware);
