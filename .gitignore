@@ -11,7 +11,7 @@ dist/
 dist-server/
 
 # Keep example files but ignore actual config
-src/targets.json
+targets.json
 !targets.json.example
 
 labrem-proxy-*.zip
