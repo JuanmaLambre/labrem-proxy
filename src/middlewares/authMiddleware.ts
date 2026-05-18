@@ -106,6 +106,8 @@ async function validateToken(token: string | undefined): Promise<TokenValidation
 }
 
 export async function authMiddleware(req: Request, res: Response, next: NextFunction): Promise<void | Response> {
+  if (req.target?.test) return next();
+
   const token = extractToken(req);
   const validation = await validateToken(token);
 

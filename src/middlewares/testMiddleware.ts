@@ -13,6 +13,6 @@ export function testMiddleware(req: Request, res: Response, next: NextFunction):
 
   if (!experienceId || !proxyEnabled) return next();
 
-  setTarget(req, res, experienceId);
-  proxyMiddleware(req, res, next);
+  setTarget(req, res, { experienceId, test: true });
+  next();
 }
