@@ -11,25 +11,25 @@ const upstreamProxy = config.upstreamProxy ? new HttpsProxyAgent(config.upstream
 const rewriteLocationHeader = (proxyRes: IncomingMessage, req: Request): void => {
   // Rewrite Location headers in redirect responses to prevent browser from navigating away
   const location = proxyRes.headers["location"];
-  if (location) {
-    const targetUrl = req.target!.url!;
-    const locationUrl = new URL(location, targetUrl);
-    const targetUrlObj = new URL(targetUrl);
+  if (!location) return;
 
-    // If the location is pointing to the target server, rewrite it to point to the proxy
-    if (
-      locationUrl.hostname === targetUrlObj.hostname &&
-      locationUrl.port === targetUrlObj.port &&
-      locationUrl.protocol === targetUrlObj.protocol
-    ) {
-      // Build the proxy URL
-      const proxyProtocol = req.protocol || "http";
-      const proxyHost = req.get("host") || `localhost:${config.port}`;
-      const newLocation = `${proxyProtocol}://${proxyHost}${locationUrl.pathname}${locationUrl.search}${locationUrl.hash}`;
+  const targetUrl = req.target!.url!;
+  const locationUrl = new URL(location, targetUrl);
+  const targetUrlObj = new URL(targetUrl);
 
-      proxyRes.headers["location"] = newLocation;
-      console.log(`Rewrote Location header from ${location} to ${newLocation}`);
-    }
+  // If the location is pointing to the target server, rewrite it to point to the proxy
+  if (
+    locationUrl.hostname === targetUrlObj.hostname &&
+    locationUrl.port === targetUrlObj.port &&
+    locationUrl.protocol === targetUrlObj.protocol
+  ) {
+    // Build the proxy URL
+    const proxyProtocol = req.protocol || "http";
+    const proxyHost = req.get("host") || `localhost:${config.port}`;
+    const newLocation = `${proxyProtocol}://${proxyHost}${locationUrl.pathname}${locationUrl.search}${locationUrl.hash}`;
+
+    proxyRes.headers["location"] = newLocation;
+    console.log(`Rewrote Location header from ${location} to ${newLocation}`);
   }
 };
 

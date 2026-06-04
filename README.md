@@ -51,7 +51,7 @@ pm2 save
 bash scripts/start.sh
 ```
 
-El script valida el entorno (`.env`, `targets.json`, certificados SSL, dependencias, build del cliente) y luego hace `pm2 start` o `pm2 restart` según corresponda.
+El script valida el entorno (`.env`, `targets.json`, dependencias, build del cliente) y luego hace `pm2 start` o `pm2 restart` según corresponda.
 
 **Comandos útiles:**
 
