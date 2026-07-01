@@ -5,6 +5,7 @@ import path from "path";
 import fs from "fs";
 import { getTargets } from "./targets.ts";
 import { authMiddleware } from "./middlewares/authMiddleware.ts";
+import { analyticsMiddleware } from "./middlewares/analyticsMiddleware.ts";
 import { targetMiddleware } from "./middlewares/targetMiddleware.ts";
 import { proxyMiddleware } from "./middlewares/proxyMiddleware.ts";
 import { corsMiddleware } from "./middlewares/corsMiddleware.ts";
@@ -52,4 +53,4 @@ if (fs.existsSync(distPath)) {
 }
 
 // Proxy middleware for all other routes (must be last)
-app.use("*", testMiddleware, authMiddleware, targetMiddleware, proxyMiddleware);
+app.use("*", testMiddleware, authMiddleware, analyticsMiddleware, targetMiddleware, proxyMiddleware);

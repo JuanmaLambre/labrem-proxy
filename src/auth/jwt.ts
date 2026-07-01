@@ -18,3 +18,10 @@ export function expiredToken(token: string): boolean {
   const now = Math.floor(Date.now() / 1000);
   return exp < now;
 }
+
+export function getTokenDuration(token: string): number {
+  const exp = getExpFromToken(token);
+  if (!exp) return 0;
+
+  return Math.floor(exp - Date.now() / 1000);
+}
