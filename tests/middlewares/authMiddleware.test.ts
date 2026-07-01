@@ -33,9 +33,12 @@ const openShiftData = {
   experience: { id: "exp-1", name: "Test Lab", body: "" },
 };
 
+const userData = { id: 1, name: "Test", surname: "User", email: "test@example.com", dni: "12345678" };
+
 const openApiResponse = {
   status: 200,
   data: {
+    user: userData,
     assignments: {
       shift_id: 1,
       shift_details: { day: TODAY, start_time: "00:00:00", end_time: "23:59:59", availability: true },
@@ -125,6 +128,7 @@ describe("authMiddleware", () => {
           fresh: true,
           timestamp: Date.now(),
           shift: openShiftData,
+          user: userData,
         });
       });
 
@@ -137,6 +141,14 @@ describe("authMiddleware", () => {
         await request(app).get("/?accessToken=mytoken");
         expect(mockedAxios.get).not.toHaveBeenCalled();
       });
+
+      it("caches with fetched being false", async () => {
+        await request(app).get("/?accessToken=mytoken");
+        expect(mockedCache.setTokenCache).toHaveBeenCalledWith(
+          "mytoken",
+          expect.objectContaining({ fetched: false }),
+        );
+      });
     });
 
     describe("and the shift is not yet open", () => {
@@ -146,6 +158,7 @@ describe("authMiddleware", () => {
           fresh: true,
           timestamp: Date.now(),
           shift: { ...openShiftData, day: TOMORROW },
+          user: userData,
         });
       });
 
@@ -245,6 +258,22 @@ describe("authMiddleware", () => {
         );
       });
 
+      it("caches the user information", async () => {
+        await request(app).get("/?accessToken=mytoken");
+        expect(mockedCache.setTokenCache).toHaveBeenCalledWith(
+          "mytoken",
+          expect.objectContaining({ user: userData }),
+        );
+      });
+
+      it("caches with fetched being true", async () => {
+        await request(app).get("/?accessToken=mytoken");
+        expect(mockedCache.setTokenCache).toHaveBeenCalledWith(
+          "mytoken",
+          expect.objectContaining({ fetched: true }),
+        );
+      });
+
       it("sets the labrem_token cookie", async () => {
         const res = await request(app).get("/?accessToken=mytoken");
         expect(res.headers["set-cookie"]).toEqual(
@@ -258,6 +287,7 @@ describe("authMiddleware", () => {
         mockedAxios.get.mockResolvedValue({
           status: 200,
           data: {
+            user: userData,
             assignments: {
               shift_id: 1,
               shift_details: { day: TOMORROW, start_time: "00:00:00", end_time: "23:59:59", availability: true },

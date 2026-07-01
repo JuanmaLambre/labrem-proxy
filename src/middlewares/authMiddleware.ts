@@ -4,14 +4,17 @@ import axios from "axios";
 import { cache, fetchTokenCache, setInvalidCache, setTokenCache } from "../auth/cache.ts";
 import config from "../config.ts";
 import { Shift } from "../../client/src/models/Shift.ts";
+import { User } from "../../client/src/models/User.ts";
 import { expiredToken } from "../auth/jwt.ts";
-import { extractToken, setTokenCookie, TOKEN_COOKIE_NAME } from "./utils.ts";
+import { extractToken, setTokenCookie } from "./utils.ts";
 
 interface ShiftValidation {
   valid: boolean;
   shift?: Shift;
+  user?: User;
   invalid?: boolean; // Must mark token as not valid (false if auth server returns 500)
   message?: string;
+  fetched?: boolean;
 }
 
 interface TokenValidation {
@@ -40,36 +43,51 @@ async function fetchShift(token: string): Promise<ShiftValidation> {
       message: `No se pudo obtener el turno asignado${message ? `: ${message}` : ""}`,
     };
   } else if (statusCode.startsWith(2)) {
-    const { shift_details: details, experience, shift_id: id } = response.data.assignments;
+    // Success path
+    const {
+      user: userData,
+      assignments: { shift_details: details, experience, shift_id: id },
+    } = response.data;
 
     const shift = new Shift({ ...details, id, experience });
-    return { valid: true, shift };
+    const user = new User(userData);
+    return { valid: true, fetched: true, shift, user };
   }
+
+  // Unexpected error
   return { invalid: false, valid: false };
 }
 
 async function getShift(token: string): Promise<ShiftValidation> {
   const cached = fetchTokenCache(token);
+  let shift, user;
 
+  // Check cache
   if (cached && !cached.fresh) {
     console.log("Cache caducado");
     cache.del(token);
   } else if (cached) {
+    // Cache is fresh, but token can be valid or not
     if (!cached.valid) return { valid: false, message: "Token inválido" };
 
     console.log("Cache encontrado");
-    const shift = new Shift(cached.shift!);
+    shift = new Shift(cached.shift!);
+    user = cached.user ? new User(cached.user) : undefined;
 
-    if (shift.isOpen) {
-      return { valid: true, shift };
-    } else if (cached.fresh) {
+    if (!shift.isOpen) {
       return { valid: false, message: "No hay turnos disponibles" };
     }
   }
 
-  // No data in cache, let's fetch it
-  console.log("Validating with LabRem API");
-  return await fetchShift(token);
+  let validation: ShiftValidation | null = null;
+  if (!shift) {
+    // No data in cache, let's fetch it
+    console.log("Validating with LabRem API");
+    validation = await fetchShift(token);
+  }
+
+  // Success return
+  return { valid: true, shift, user, ...validation };
 }
 
 async function validateToken(token: string | undefined): Promise<TokenValidation> {
@@ -78,7 +96,7 @@ async function validateToken(token: string | undefined): Promise<TokenValidation
   // TODO: Redirect
   if (expiredToken(token)) return { valid: false, message: "Experiencia finalizada" };
 
-  const { shift, ...shiftValidation } = await getShift(token);
+  const { shift, user, ...shiftValidation } = await getShift(token);
 
   if (shiftValidation.invalid || !shift) {
     if (shiftValidation.invalid) {
@@ -93,7 +111,7 @@ async function validateToken(token: string | undefined): Promise<TokenValidation
     return { valid: false, message: "Error de autenticación, vuelva a intentar" };
   }
 
-  setTokenCache(token, { shift: shift.toJSON() });
+  setTokenCache(token, { shift: shift.toJSON(), user: user?.toJSON(), fetched: !!shiftValidation.fetched });
 
   if (shift.isOpen) {
     return { valid: true, shift };

@@ -1,7 +1,6 @@
 import NodeCache from "node-cache";
-import config from "../config.ts";
-import { expiredToken } from "./jwt.ts";
 import { ShiftJSON } from "../../client/src/models/Shift.ts";
+import { UserJSON } from "../../client/src/models/User.ts";
 
 const FRESHNESS_THRESHOLD = 60; // Seconds
 
@@ -9,17 +8,17 @@ export interface CachedTokenData {
   timestamp: number;
   valid: boolean;
   shift?: ShiftJSON;
+  user?: UserJSON;
   userInfo?: any;
   exitTime?: number;
   fresh: boolean;
+  fetched?: boolean;
 }
 
 // Initialize cache
 // TTL: time before cached token expires
 // checkperiod: how often to check for expired tokens
 const cache = new NodeCache({
-  stdTTL: config.cacheTtl,
-  checkperiod: config.cacheCheckPeriod,
   useClones: false,
 });
 
