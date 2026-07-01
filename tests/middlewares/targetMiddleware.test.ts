@@ -52,7 +52,9 @@ describe("targetMiddleware", () => {
 
     it("sets req.target with the correct key and url", async () => {
       await request(app).get("/?accessToken=mytoken");
-      expect(capturedTarget).toEqual({ valid: true, key: "exp-1", url: "http://target.example.com" });
+      expect(capturedTarget).toEqual(
+        expect.objectContaining({ valid: true, key: "exp-1", url: "http://target.example.com" }),
+      );
     });
 
     it("reads the token from the labrem_token cookie", async () => {

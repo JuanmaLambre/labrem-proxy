@@ -13,16 +13,20 @@ async function createAnalyticsSession(token: string, cache: CachedTokenData) {
   const user = userData ? new User(userData) : null;
   const shift = new Shift(shiftData!);
 
-  await axios.post(ANALYTICS_URL, {
-    headers: { "Content-Type": "application/json" },
-    body: {
-      session_id: token,
-      student_name: user?.fullname,
-      student_email: user?.email,
-      experiment: shift.experience.id,
-      duration: getTokenDuration(token),
-    },
-  });
+  await axios
+    .post(ANALYTICS_URL, {
+      headers: { "Content-Type": "application/json" },
+      body: {
+        session_id: token,
+        student_name: user?.fullname,
+        student_email: user?.email,
+        experiment: shift.experience.id,
+        duration: getTokenDuration(token),
+      },
+    })
+    .catch((error) => {
+      console.error("Error creating analytics session:", error);
+    });
 }
 
 function appendAnalyticsHeaders(req: Request, token: string, cache: CachedTokenData) {

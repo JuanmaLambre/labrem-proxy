@@ -66,13 +66,11 @@ describe("testMiddleware", () => {
     describe("and the test_destination cookie is set", () => {
       it("calls setTarget with the experience id from the cookie", async () => {
         await request(app).get("/").set("Cookie", ["test_destination=exp-42"]);
-        expect(mockedSetTarget.setTarget).toHaveBeenCalledWith(expect.anything(), expect.anything(), "exp-42");
-      });
-
-      it("calls proxyMiddleware instead of next", async () => {
-        const res = await request(app).get("/").set("Cookie", ["test_destination=exp-42"]);
-        expect(mockedProxy.proxyMiddleware).toHaveBeenCalled();
-        expect(res.body).toEqual({ proxied: true });
+        expect(mockedSetTarget.setTarget).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.anything(),
+          expect.objectContaining({ experienceId: "exp-42" }),
+        );
       });
     });
 

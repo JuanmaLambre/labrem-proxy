@@ -50,7 +50,7 @@ async function fetchShift(token: string): Promise<ShiftValidation> {
     } = response.data;
 
     const shift = new Shift({ ...details, id, experience });
-    const user = new User(userData);
+    const user = userData ? new User(userData) : undefined;
     return { valid: true, fetched: true, shift, user };
   }
 

@@ -25,6 +25,8 @@ beforeEach(() => {
   cache.flushAll();
   (mockedJwt.expiredToken as jest.Mock).mockReturnValue(false);
   (mockedJwt.getExpFromToken as jest.Mock).mockReturnValue(Math.floor(Date.now() / 1000) + 3600);
+  (mockedJwt.getTokenDuration as jest.Mock).mockReturnValue(3600);
+  mockedAxios.post.mockResolvedValue({});
 });
 
 describe("End-to-end tests", () => {
