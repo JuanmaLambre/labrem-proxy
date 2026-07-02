@@ -72,13 +72,14 @@ describe("analyticsMiddleware", () => {
         expect(mockedAxios.post).toHaveBeenCalledWith(
           expect.stringContaining("session_create.php"),
           expect.objectContaining({
-            body: expect.objectContaining({
-              session_id: "mytoken",
-              student_name: "Test User",
-              student_email: "test@example.com",
-              experiment: "exp-1",
-              duration: TOKEN_DURATION,
-            }),
+            session_id: "mytoken",
+            student_name: "Test User",
+            student_email: "test@example.com",
+            experiment: "exp-1",
+            duration: TOKEN_DURATION,
+          }),
+          expect.objectContaining({
+            headers: { "Content-Type": "application/json" },
           }),
         );
       });
