@@ -38,6 +38,13 @@ echo Uploaded
 rm "$ARCHIVE_PATH"
 
 echo "Zip transfered. Extracting on remote server..."
-ssh "${SSH_OPTS[@]}" "$SSH_USER@$TARGET_HOST" "cd $DEST_PATH; unzip -o labrem-proxy-*.zip -d labrem-proxy; rm labrem-proxy-*.zip; cd labrem-proxy; npm install --production;"
+ssh "${SSH_OPTS[@]}" "$SSH_USER@$TARGET_HOST" <<EOF
+  cd $DEST_PATH;
+  unzip -o labrem-proxy-*.zip -d labrem-proxy;
+  rm labrem-proxy-*.zip;
+  cd labrem-proxy;
+  npm install --production;
+  pm2 restart labrem-proxy;
+EOF
 
 echo "Done. Deployed to $DEST_PATH on $TARGET_HOST."

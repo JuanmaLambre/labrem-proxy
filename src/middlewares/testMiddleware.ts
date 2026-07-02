@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from "express";
 import { setTarget } from "./targetMiddleware.ts";
-import { proxyMiddleware } from "./proxyMiddleware.ts";
 import config from "../config.ts";
 
 const TEST_COOKIE_NAME = "test_destination";
