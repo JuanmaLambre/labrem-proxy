@@ -13,6 +13,7 @@ export interface CachedTokenData {
   exitTime?: number;
   fresh: boolean;
   fetched?: boolean;
+  rebootTriggered?: boolean;
 }
 
 // Initialize cache

@@ -5,14 +5,17 @@ import axios from "axios";
 import { authMiddleware } from "../../src/middlewares/authMiddleware.ts";
 import * as cache from "../../src/auth/cache.ts";
 import * as jwt from "../../src/auth/jwt.ts";
+import * as reboot from "../../src/reboot.ts";
 
 jest.mock("axios");
 jest.mock("../../src/auth/cache.ts");
 jest.mock("../../src/auth/jwt.ts");
+jest.mock("../../src/reboot.ts");
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 const mockedCache = cache as jest.Mocked<typeof cache>;
 const mockedJwt = jwt as jest.Mocked<typeof jwt>;
+const mockedReboot = reboot as jest.Mocked<typeof reboot>;
 
 function dateToString(date: Date): string {
   const year = date.getFullYear();
@@ -100,6 +103,63 @@ describe("authMiddleware", () => {
       mockedJwt.expiredToken.mockReturnValue(true);
       await request(app).get("/?accessToken=mytoken");
       expect(mockedAxios.get).not.toHaveBeenCalled();
+    });
+
+    describe("and nothing is cached for the token", () => {
+      it("does not trigger a reboot", async () => {
+        mockedJwt.expiredToken.mockReturnValue(true);
+        mockedCache.fetchTokenCache.mockReturnValue(null);
+        await request(app).get("/?accessToken=mytoken");
+        expect(mockedReboot.triggerReboot).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("and the shift is cached", () => {
+      const cachedShift = {
+        valid: true,
+        fresh: true,
+        timestamp: Date.now(),
+        shift: { ...openShiftData },
+        rebootTriggered: false,
+      };
+
+      beforeEach(() => {
+        mockedJwt.expiredToken.mockReturnValue(true);
+        mockedCache.fetchTokenCache.mockReturnValue(cachedShift);
+      });
+
+      it("triggers a reboot for the cached experience", async () => {
+        await request(app).get("/?accessToken=mytoken");
+        expect(mockedReboot.triggerReboot).toHaveBeenCalledWith("exp-1");
+      });
+
+      it("marks the cache entry as rebootTriggered", async () => {
+        await request(app).get("/?accessToken=mytoken");
+        expect(mockedCache.setTokenCache).toHaveBeenCalledWith(
+          "mytoken",
+          expect.objectContaining({ rebootTriggered: true }),
+        );
+      });
+
+      it("does not trigger a second reboot once already triggered", async () => {
+        mockedCache.fetchTokenCache.mockReturnValue({ ...cachedShift, rebootTriggered: true });
+        await request(app).get("/?accessToken=mytoken");
+        expect(mockedReboot.triggerReboot).not.toHaveBeenCalled();
+      });
+
+      it("returns a plain 401 for a background poll (no Sec-Fetch-Mode)", async () => {
+        const res = await request(app).get("/?accessToken=mytoken");
+        expect(res.status).toBe(401);
+        expect(res.body).toEqual({ error: "Unauthorized", message: "Experiencia finalizada" });
+      });
+
+      it("redirects to /proxy/espera for a top-level page navigation", async () => {
+        const res = await request(app)
+          .get("/?accessToken=mytoken")
+          .set("Sec-Fetch-Mode", "navigate");
+        expect(res.status).toBe(302);
+        expect(res.headers.location).toBe("/proxy/espera?name=Test%20Lab&reason=finalizado");
+      });
     });
   });
 

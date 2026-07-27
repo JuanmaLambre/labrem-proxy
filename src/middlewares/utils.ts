@@ -17,3 +17,10 @@ export function buildTokenCookie(req: Request): string {
   const maxAge = Math.floor(getExpFromToken(token!)! - Date.now() / 1000);
   return `${TOKEN_COOKIE_NAME}=${token}; Path=/; ${maxAge ? `Max-Age=${maxAge};` : ""}`;
 }
+
+// True for a top-level page load (address bar / reload), false for background
+// fetch/XHR polling. Used to decide whether an expired session should get an
+// HTML redirect (browser navigation) or a plain 401 (background poll).
+export function isTopLevelNavigation(req: Request): boolean {
+  return req.headers["sec-fetch-mode"] === "navigate";
+}

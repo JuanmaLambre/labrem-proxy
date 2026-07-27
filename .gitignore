@@ -13,6 +13,8 @@ dist-server/
 # Keep example files but ignore actual config
 targets.json
 !targets.json.example
+rebootTargets.json
+!rebootTargets.json.example
 
 labrem-proxy-*.zip
 local/
