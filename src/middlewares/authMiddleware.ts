@@ -5,9 +5,9 @@ import { cache, fetchTokenCache, setInvalidCache, setTokenCache } from "../auth/
 import config from "../config.ts";
 import { Shift } from "../../client/src/models/Shift.ts";
 import { User } from "../../client/src/models/User.ts";
-import { expiredToken, getTokenDuration } from "../auth/jwt.ts";
+import { expiredToken, getExpFromToken } from "../auth/jwt.ts";
 import { extractToken, setTokenCookie, isTopLevelNavigation } from "./utils.ts";
-import { triggerReboot } from "../reboot.ts";
+import { schedulePendingReboot } from "../pendingReboots.ts";
 
 interface ShiftValidation {
   valid: boolean;
@@ -91,48 +91,23 @@ async function getShift(token: string): Promise<ShiftValidation> {
   return { valid: true, shift, user, ...validation };
 }
 
-// The expired-token branch in validateToken() only reboots the lab once a
-// request carrying that expired token actually reaches us — a student who
-// closes the tab before their shift ends stops sending requests entirely, so
-// that branch never runs and the hardware is left in whatever state they
-// left it. This schedules the reboot against the token's own wall-clock
-// expiry instead, so it fires even with no further requests. Runs once per
-// token (guarded by rebootScheduled in cache) even though this is called on
-// every request for an open shift, since polling re-enters this path often.
-function scheduleRebootAtExpiry(token: string, experienceId: string | undefined): void {
-  const cached = fetchTokenCache(token);
-  if (cached?.rebootScheduled) return;
+function scheduleRebootAtExpiry(token: string, shift: Shift): void {
+  const expSeconds = getExpFromToken(token);
+  const experienceId = shift.experience?.id;
+  if (!expSeconds || !experienceId) return;
 
-  const delayMs = getTokenDuration(token) * 1000;
-  if (!delayMs || delayMs <= 0) return;
-
-  // Snapshot now and carry it into the timer closure: the only thing this
-  // timer does is flip rebootTriggered once it fires, and it's the sole
-  // timer for this token (guarded by rebootScheduled above), so there's no
-  // need to re-read the cache at fire time.
-  const scheduledEntry = { ...cached, rebootScheduled: true };
-  setTokenCache(token, scheduledEntry);
-
-  setTimeout(() => {
-    triggerReboot(experienceId);
-    setTokenCache(token, { ...scheduledEntry, rebootTriggered: true });
-  }, delayMs);
+  schedulePendingReboot({
+    shiftId: String(shift.id),
+    experienceId,
+    expiresAt: expSeconds * 1000,
+  });
 }
 
 async function validateToken(token: string | undefined, req: Request): Promise<TokenValidation> {
   if (!token) return { valid: false, message: "Necesita loguearse" };
 
   if (expiredToken(token)) {
-    const cached = fetchTokenCache(token);
-    const experience = cached?.shift?.experience;
-
-    // Reboot the physical lab hardware exactly once per shift, the first time
-    // we observe the expired token (regardless of whether this request is a
-    // background poll or a page navigation).
-    if (cached && !cached.rebootTriggered) {
-      triggerReboot(experience?.id);
-      setTokenCache(token, { ...cached, rebootTriggered: true });
-    }
+    const experience = fetchTokenCache(token)?.shift?.experience;
 
     if (isTopLevelNavigation(req) && experience?.name) {
       const name = encodeURIComponent(experience.name);
@@ -160,7 +135,7 @@ async function validateToken(token: string | undefined, req: Request): Promise<T
   setTokenCache(token, { shift: shift.toJSON(), user: user?.toJSON(), fetched: !!shiftValidation.fetched });
 
   if (shift.isOpen) {
-    scheduleRebootAtExpiry(token, shift.experience?.id);
+    scheduleRebootAtExpiry(token, shift);
     return { valid: true, shift };
   } else {
     const msUntilOpen = new Date(`${shift.day}T${shift.startTime}`).getTime() - Date.now();

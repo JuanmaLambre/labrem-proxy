@@ -22,6 +22,16 @@ function createTestToken(payload: object): string {
   return `${encode({ alg: "HS256" })}.${encode(payload)}.sig`;
 }
 
+// The pending-reboot store is a process-wide singleton that outlives each
+// test, so tests that sweep need a shift of their own and must count only the
+// reboots for their own experience.
+let lastShiftId = 100;
+const nextShiftId = () => (lastShiftId += 1);
+
+function rebootCallsFor(experienceId: string): unknown[] {
+  return (mockedReboot.triggerReboot as jest.Mock).mock.calls.filter(([id]) => id === experienceId);
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   cache.flushAll();
@@ -123,16 +133,19 @@ describe("End-to-end tests", () => {
   describe("when a shift that was open expires mid-session", () => {
     const TODAY = new Date().toISOString().split("T")[0];
     let token: string;
+    let experienceId: string;
 
     beforeEach(async () => {
+      const shiftId = nextShiftId();
+      experienceId = `exp-${shiftId}`;
       token = createTestToken({ exp: Math.floor(Date.now() / 1000) + 3600 });
       mockedAxios.get.mockResolvedValue({
         status: 200,
         data: {
           assignments: {
-            shift_id: 1,
+            shift_id: shiftId,
             shift_details: { day: TODAY, start_time: "00:00:00", end_time: "23:59:59", availability: true },
-            experience: { id: "exp-1", name: "Test Lab", body: "" },
+            experience: { id: experienceId, name: "Test Lab", body: "" },
           },
         },
       });
@@ -157,13 +170,30 @@ describe("End-to-end tests", () => {
       expect(res.headers.location).toBe("/proxy/espera?name=Test%20Lab&reason=finalizado");
     });
 
-    it("triggers exactly one reboot even after several requests with the expired token", async () => {
+    // The whole point of the feature: the student closed the tab, so no request
+    // ever carries the expired token, and the reboot still has to happen.
+    it("reboots the lab after the shift expires with no further requests", async () => {
+      const { sweepPendingReboots } = await import("../../src/rebootSweeper.ts");
+
+      sweepPendingReboots(Date.now() + 3_601_000);
+
+      expect(rebootCallsFor(experienceId)).toHaveLength(1);
+    });
+
+    it("reboots exactly once, from the sweeper rather than from the requests", async () => {
       await request(app).get(`/?accessToken=${token}`);
       await request(app).get(`/?accessToken=${token}`).set("Sec-Fetch-Mode", "navigate");
       await request(app).get(`/?accessToken=${token}`);
 
-      expect(mockedReboot.triggerReboot).toHaveBeenCalledTimes(1);
-      expect(mockedReboot.triggerReboot).toHaveBeenCalledWith("exp-1");
+      // Requests only ever record that a reboot is owed.
+      expect(mockedReboot.triggerReboot).not.toHaveBeenCalled();
+
+      const { sweepPendingReboots } = await import("../../src/rebootSweeper.ts");
+      const pastExpiry = Date.now() + 3_601_000;
+      sweepPendingReboots(pastExpiry);
+      sweepPendingReboots(pastExpiry + 1_000);
+
+      expect(rebootCallsFor(experienceId)).toHaveLength(1);
     });
   });
 

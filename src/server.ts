@@ -1,10 +1,8 @@
-import https from "https";
 import http from "http";
-import fs from "fs";
-import path from "path";
 import { app } from "./app.ts";
 import { default as config } from "./config.ts";
 import { getTargets } from "./targets.ts";
+import { startRebootSweeper } from "./rebootSweeper.ts";
 
 // Start server
 function startServer() {
@@ -20,7 +18,10 @@ function startServer() {
     console.log(`Port: ${config.port}`);
     console.log(`Available Targets: ${Object.keys(getTargets()).join(", ")}`);
     console.log(`Authentication URL: ${config.authenticationUrl || "NOT CONFIGURED"}`);
+    console.log(`Reboot sweep interval: ${config.rebootSweepIntervalMs}ms`);
     console.log("=".repeat(60));
+
+    startRebootSweeper();
   });
 }
 

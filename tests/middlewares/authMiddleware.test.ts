@@ -5,17 +5,17 @@ import axios from "axios";
 import { authMiddleware } from "../../src/middlewares/authMiddleware.ts";
 import * as cache from "../../src/auth/cache.ts";
 import * as jwt from "../../src/auth/jwt.ts";
-import * as reboot from "../../src/reboot.ts";
+import * as pendingReboots from "../../src/pendingReboots.ts";
 
 jest.mock("axios");
 jest.mock("../../src/auth/cache.ts");
 jest.mock("../../src/auth/jwt.ts");
-jest.mock("../../src/reboot.ts");
+jest.mock("../../src/pendingReboots.ts");
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 const mockedCache = cache as jest.Mocked<typeof cache>;
 const mockedJwt = jwt as jest.Mocked<typeof jwt>;
-const mockedReboot = reboot as jest.Mocked<typeof reboot>;
+const mockedPendingReboots = pendingReboots as jest.Mocked<typeof pendingReboots>;
 
 function dateToString(date: Date): string {
   const year = date.getFullYear();
@@ -109,22 +109,12 @@ describe("authMiddleware", () => {
       expect(mockedAxios.get).not.toHaveBeenCalled();
     });
 
-    describe("and nothing is cached for the token", () => {
-      it("does not trigger a reboot", async () => {
-        mockedJwt.expiredToken.mockReturnValue(true);
-        mockedCache.fetchTokenCache.mockReturnValue(null);
-        await request(app).get("/?accessToken=mytoken");
-        expect(mockedReboot.triggerReboot).not.toHaveBeenCalled();
-      });
-    });
-
     describe("and the shift is cached", () => {
       const cachedShift = {
         valid: true,
         fresh: true,
         timestamp: Date.now(),
         shift: { ...openShiftData },
-        rebootTriggered: false,
       };
 
       beforeEach(() => {
@@ -132,23 +122,11 @@ describe("authMiddleware", () => {
         mockedCache.fetchTokenCache.mockReturnValue(cachedShift);
       });
 
-      it("triggers a reboot for the cached experience", async () => {
+      // rebootSweeper is the sole owner of reboots, firing from the on-disk
+      // record; rebooting here as well would reboot the machine twice.
+      it("does not schedule or fire a reboot", async () => {
         await request(app).get("/?accessToken=mytoken");
-        expect(mockedReboot.triggerReboot).toHaveBeenCalledWith("exp-1");
-      });
-
-      it("marks the cache entry as rebootTriggered", async () => {
-        await request(app).get("/?accessToken=mytoken");
-        expect(mockedCache.setTokenCache).toHaveBeenCalledWith(
-          "mytoken",
-          expect.objectContaining({ rebootTriggered: true }),
-        );
-      });
-
-      it("does not trigger a second reboot once already triggered", async () => {
-        mockedCache.fetchTokenCache.mockReturnValue({ ...cachedShift, rebootTriggered: true });
-        await request(app).get("/?accessToken=mytoken");
-        expect(mockedReboot.triggerReboot).not.toHaveBeenCalled();
+        expect(mockedPendingReboots.schedulePendingReboot).not.toHaveBeenCalled();
       });
 
       it("returns a plain 401 for a background poll (no Sec-Fetch-Mode)", async () => {
@@ -345,63 +323,40 @@ describe("authMiddleware", () => {
         );
       });
 
-      describe("scheduling a reboot at the token's own expiry", () => {
+      describe("recording a reboot at the token's own expiry", () => {
+        const EXP_SECONDS = 1_800_000_000;
+
         beforeEach(() => {
-          jest.useFakeTimers({ legacyFakeTimers: true });
+          mockedJwt.getExpFromToken.mockReturnValue(EXP_SECONDS);
         });
 
-        it("triggers a reboot once the token's remaining lifetime elapses, with no further requests", async () => {
-          mockedJwt.getTokenDuration.mockReturnValue(120);
+        it("records the reboot against the token's expiry, keyed by shift", async () => {
           await request(app).get("/?accessToken=mytoken");
 
-          expect(mockedReboot.triggerReboot).not.toHaveBeenCalled();
-          jest.advanceTimersByTime(120000);
-          expect(mockedReboot.triggerReboot).toHaveBeenCalledWith("exp-1");
-        });
-
-        it("marks the cache entry as rebootTriggered once the timer fires", async () => {
-          mockedJwt.getTokenDuration.mockReturnValue(120);
-          await request(app).get("/?accessToken=mytoken");
-
-          jest.advanceTimersByTime(120000);
-          expect(mockedCache.setTokenCache).toHaveBeenCalledWith(
-            "mytoken",
-            expect.objectContaining({ rebootTriggered: true }),
-          );
-        });
-
-        it("does not schedule a second timer when the same token is seen again (e.g. a later poll)", async () => {
-          mockedJwt.getTokenDuration.mockReturnValue(120);
-
-          // First request: caches shift+scheduled flag, as a real subsequent poll would see it.
-          // The real (non-mocked) cache merges every setTokenCache write for the token into one
-          // entry; reproduce that union here since mockedCache.fetchTokenCache doesn't reflect
-          // mockedCache.setTokenCache calls automatically.
-          await request(app).get("/?accessToken=mytoken");
-          const mergedEntry = mockedCache.setTokenCache.mock.calls.reduce(
-            (acc, [, data]) => ({ ...acc, ...data }),
-            {} as Record<string, unknown>,
-          );
-          mockedCache.fetchTokenCache.mockReturnValue({
-            valid: true,
-            fresh: true,
-            timestamp: Date.now(),
-            ...mergedEntry,
+          expect(mockedPendingReboots.schedulePendingReboot).toHaveBeenCalledWith({
+            shiftId: "1",
+            experienceId: "exp-1",
+            expiresAt: EXP_SECONDS * 1000,
           });
-
-          // Second request (poll) with the same token: must not add a second timer.
-          await request(app).get("/?accessToken=mytoken");
-
-          jest.advanceTimersByTime(120000);
-          expect(mockedReboot.triggerReboot).toHaveBeenCalledTimes(1);
         });
 
-        it("does not schedule a reboot when the token carries no usable expiry", async () => {
-          mockedJwt.getTokenDuration.mockReturnValue(0);
+        // De-duping now lives in the store, so the middleware is free to write
+        // on every poll — but it must still hand over an identical record, or
+        // the store would treat it as a new deadline.
+        it("records the same shift identically on a later poll", async () => {
+          await request(app).get("/?accessToken=mytoken");
           await request(app).get("/?accessToken=mytoken");
 
-          jest.advanceTimersByTime(24 * 60 * 60 * 1000);
-          expect(mockedReboot.triggerReboot).not.toHaveBeenCalled();
+          const calls = mockedPendingReboots.schedulePendingReboot.mock.calls;
+          expect(calls).toHaveLength(2);
+          expect(calls[0]).toEqual(calls[1]);
+        });
+
+        it("records nothing when the token carries no usable expiry", async () => {
+          mockedJwt.getExpFromToken.mockReturnValue(null);
+          await request(app).get("/?accessToken=mytoken");
+
+          expect(mockedPendingReboots.schedulePendingReboot).not.toHaveBeenCalled();
         });
       });
     });
