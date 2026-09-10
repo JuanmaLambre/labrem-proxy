@@ -65,6 +65,10 @@ describe("authMiddleware", () => {
     app.use((req, res) => res.json({ success: true }));
   });
 
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   describe("token extraction", () => {
     it("returns 401 when no token is provided", async () => {
       const res = await request(app).get("/");
@@ -339,6 +343,66 @@ describe("authMiddleware", () => {
         expect(res.headers["set-cookie"]).toEqual(
           expect.arrayContaining([expect.stringContaining("labrem_token=mytoken")]),
         );
+      });
+
+      describe("scheduling a reboot at the token's own expiry", () => {
+        beforeEach(() => {
+          jest.useFakeTimers({ legacyFakeTimers: true });
+        });
+
+        it("triggers a reboot once the token's remaining lifetime elapses, with no further requests", async () => {
+          mockedJwt.getTokenDuration.mockReturnValue(120);
+          await request(app).get("/?accessToken=mytoken");
+
+          expect(mockedReboot.triggerReboot).not.toHaveBeenCalled();
+          jest.advanceTimersByTime(120000);
+          expect(mockedReboot.triggerReboot).toHaveBeenCalledWith("exp-1");
+        });
+
+        it("marks the cache entry as rebootTriggered once the timer fires", async () => {
+          mockedJwt.getTokenDuration.mockReturnValue(120);
+          await request(app).get("/?accessToken=mytoken");
+
+          jest.advanceTimersByTime(120000);
+          expect(mockedCache.setTokenCache).toHaveBeenCalledWith(
+            "mytoken",
+            expect.objectContaining({ rebootTriggered: true }),
+          );
+        });
+
+        it("does not schedule a second timer when the same token is seen again (e.g. a later poll)", async () => {
+          mockedJwt.getTokenDuration.mockReturnValue(120);
+
+          // First request: caches shift+scheduled flag, as a real subsequent poll would see it.
+          // The real (non-mocked) cache merges every setTokenCache write for the token into one
+          // entry; reproduce that union here since mockedCache.fetchTokenCache doesn't reflect
+          // mockedCache.setTokenCache calls automatically.
+          await request(app).get("/?accessToken=mytoken");
+          const mergedEntry = mockedCache.setTokenCache.mock.calls.reduce(
+            (acc, [, data]) => ({ ...acc, ...data }),
+            {} as Record<string, unknown>,
+          );
+          mockedCache.fetchTokenCache.mockReturnValue({
+            valid: true,
+            fresh: true,
+            timestamp: Date.now(),
+            ...mergedEntry,
+          });
+
+          // Second request (poll) with the same token: must not add a second timer.
+          await request(app).get("/?accessToken=mytoken");
+
+          jest.advanceTimersByTime(120000);
+          expect(mockedReboot.triggerReboot).toHaveBeenCalledTimes(1);
+        });
+
+        it("does not schedule a reboot when the token carries no usable expiry", async () => {
+          mockedJwt.getTokenDuration.mockReturnValue(0);
+          await request(app).get("/?accessToken=mytoken");
+
+          jest.advanceTimersByTime(24 * 60 * 60 * 1000);
+          expect(mockedReboot.triggerReboot).not.toHaveBeenCalled();
+        });
       });
     });
 

@@ -14,6 +14,7 @@ export interface CachedTokenData {
   fresh: boolean;
   fetched?: boolean;
   rebootTriggered?: boolean;
+  rebootScheduled?: boolean;
 }
 
 // Initialize cache
