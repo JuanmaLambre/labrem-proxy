@@ -3,9 +3,11 @@ import axios from "axios";
 import { app } from "../../src/app.ts";
 import { cache } from "../../src/auth/cache.ts";
 import * as mockedJwt from "../../src/auth/jwt.ts";
+import * as mockedReboot from "../../src/reboot.ts";
 
 jest.mock("axios");
 jest.mock("../../src/auth/jwt.ts");
+jest.mock("../../src/reboot.ts");
 jest.mock("../../src/middlewares/proxyMiddleware.ts", () => ({
   proxyMiddleware: (req: any, res: any) => res.status(200).json({ proxied: true }),
 }));
@@ -115,6 +117,53 @@ describe("End-to-end tests", () => {
       const res = await request(app).get(`/?accessToken=${token}`);
       expect(res.status).toBe(302);
       expect(res.headers.location).toMatch(/^\/proxy\/espera\?name=Test%20Lab&redirectIn=\d+$/);
+    });
+  });
+
+  describe("when a shift that was open expires mid-session", () => {
+    const TODAY = new Date().toISOString().split("T")[0];
+    let token: string;
+
+    beforeEach(async () => {
+      token = createTestToken({ exp: Math.floor(Date.now() / 1000) + 3600 });
+      mockedAxios.get.mockResolvedValue({
+        status: 200,
+        data: {
+          assignments: {
+            shift_id: 1,
+            shift_details: { day: TODAY, start_time: "00:00:00", end_time: "23:59:59", availability: true },
+            experience: { id: "exp-1", name: "Test Lab", body: "" },
+          },
+        },
+      });
+
+      // First request: shift is open, real cache gets populated with the experience.
+      const opened = await request(app).get(`/?accessToken=${token}`);
+      expect(opened.status).toBe(200);
+
+      // Now the shift expires.
+      (mockedJwt.expiredToken as jest.Mock).mockReturnValue(true);
+    });
+
+    it("returns a plain 401 for a background poll (no Sec-Fetch-Mode)", async () => {
+      const res = await request(app).get(`/?accessToken=${token}`);
+      expect(res.status).toBe(401);
+      expect(res.body).toEqual({ error: "Unauthorized", message: "Experiencia finalizada" });
+    });
+
+    it("redirects to /proxy/espera?reason=finalizado for a real page navigation", async () => {
+      const res = await request(app).get(`/?accessToken=${token}`).set("Sec-Fetch-Mode", "navigate");
+      expect(res.status).toBe(302);
+      expect(res.headers.location).toBe("/proxy/espera?name=Test%20Lab&reason=finalizado");
+    });
+
+    it("triggers exactly one reboot even after several requests with the expired token", async () => {
+      await request(app).get(`/?accessToken=${token}`);
+      await request(app).get(`/?accessToken=${token}`).set("Sec-Fetch-Mode", "navigate");
+      await request(app).get(`/?accessToken=${token}`);
+
+      expect(mockedReboot.triggerReboot).toHaveBeenCalledTimes(1);
+      expect(mockedReboot.triggerReboot).toHaveBeenCalledWith("exp-1");
     });
   });
 

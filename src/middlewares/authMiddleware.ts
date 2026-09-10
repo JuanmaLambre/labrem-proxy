@@ -6,7 +6,8 @@ import config from "../config.ts";
 import { Shift } from "../../client/src/models/Shift.ts";
 import { User } from "../../client/src/models/User.ts";
 import { expiredToken } from "../auth/jwt.ts";
-import { extractToken, setTokenCookie } from "./utils.ts";
+import { extractToken, setTokenCookie, isTopLevelNavigation } from "./utils.ts";
+import { triggerReboot } from "../reboot.ts";
 
 interface ShiftValidation {
   valid: boolean;
@@ -90,11 +91,28 @@ async function getShift(token: string): Promise<ShiftValidation> {
   return { valid: true, shift, user, ...validation };
 }
 
-async function validateToken(token: string | undefined): Promise<TokenValidation> {
+async function validateToken(token: string | undefined, req: Request): Promise<TokenValidation> {
   if (!token) return { valid: false, message: "Necesita loguearse" };
 
-  // TODO: Redirect
-  if (expiredToken(token)) return { valid: false, message: "Experiencia finalizada" };
+  if (expiredToken(token)) {
+    const cached = fetchTokenCache(token);
+    const experience = cached?.shift?.experience;
+
+    // Reboot the physical lab hardware exactly once per shift, the first time
+    // we observe the expired token (regardless of whether this request is a
+    // background poll or a page navigation).
+    if (cached && !cached.rebootTriggered) {
+      triggerReboot(experience?.id);
+      setTokenCache(token, { ...cached, rebootTriggered: true });
+    }
+
+    if (isTopLevelNavigation(req) && experience?.name) {
+      const name = encodeURIComponent(experience.name);
+      return { valid: true, redirectTo: `/proxy/espera?name=${name}&reason=finalizado` };
+    }
+
+    return { valid: false, message: "Experiencia finalizada" };
+  }
 
   const { shift, user, ...shiftValidation } = await getShift(token);
 
@@ -127,7 +145,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   if (req.target?.test) return next();
 
   const token = extractToken(req);
-  const validation = await validateToken(token);
+  const validation = await validateToken(token, req);
 
   if (!validation.valid) {
     return res.status(401).json({
