@@ -6,6 +6,7 @@ const config = {
   targetsFilepath: process.env.TARGETS_CONFIG || "targets.json",
   rebootTargetsFilepath: process.env.REBOOT_TARGETS_CONFIG || "rebootTargets.json",
   rebootSecret: process.env.REBOOT_SECRET,
+  pendingRebootsFilepath: process.env.PENDING_REBOOTS_FILE || "pendingReboots.json",
   upstreamProxy: process.env.HTTPS_PROXY || process.env.HTTP_PROXY,
   testProxyEnabled: process.env.TEST_PROXY_ENABLED === "true",
 } as const;
