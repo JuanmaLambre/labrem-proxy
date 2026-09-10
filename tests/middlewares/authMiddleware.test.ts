@@ -5,17 +5,17 @@ import axios from "axios";
 import { authMiddleware } from "../../src/middlewares/authMiddleware.ts";
 import * as cache from "../../src/auth/cache.ts";
 import * as jwt from "../../src/auth/jwt.ts";
-import * as reboot from "../../src/reboot.ts";
+import * as pendingReboots from "../../src/pendingReboots.ts";
 
 jest.mock("axios");
 jest.mock("../../src/auth/cache.ts");
 jest.mock("../../src/auth/jwt.ts");
-jest.mock("../../src/reboot.ts");
+jest.mock("../../src/pendingReboots.ts");
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 const mockedCache = cache as jest.Mocked<typeof cache>;
 const mockedJwt = jwt as jest.Mocked<typeof jwt>;
-const mockedReboot = reboot as jest.Mocked<typeof reboot>;
+const mockedPendingReboots = pendingReboots as jest.Mocked<typeof pendingReboots>;
 
 function dateToString(date: Date): string {
   const year = date.getFullYear();
@@ -65,6 +65,10 @@ describe("authMiddleware", () => {
     app.use((req, res) => res.json({ success: true }));
   });
 
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   describe("token extraction", () => {
     it("returns 401 when no token is provided", async () => {
       const res = await request(app).get("/");
@@ -105,22 +109,12 @@ describe("authMiddleware", () => {
       expect(mockedAxios.get).not.toHaveBeenCalled();
     });
 
-    describe("and nothing is cached for the token", () => {
-      it("does not trigger a reboot", async () => {
-        mockedJwt.expiredToken.mockReturnValue(true);
-        mockedCache.fetchTokenCache.mockReturnValue(null);
-        await request(app).get("/?accessToken=mytoken");
-        expect(mockedReboot.triggerReboot).not.toHaveBeenCalled();
-      });
-    });
-
     describe("and the shift is cached", () => {
       const cachedShift = {
         valid: true,
         fresh: true,
         timestamp: Date.now(),
         shift: { ...openShiftData },
-        rebootTriggered: false,
       };
 
       beforeEach(() => {
@@ -128,23 +122,11 @@ describe("authMiddleware", () => {
         mockedCache.fetchTokenCache.mockReturnValue(cachedShift);
       });
 
-      it("triggers a reboot for the cached experience", async () => {
+      // rebootSweeper is the sole owner of reboots, firing from the on-disk
+      // record; rebooting here as well would reboot the machine twice.
+      it("does not schedule or fire a reboot", async () => {
         await request(app).get("/?accessToken=mytoken");
-        expect(mockedReboot.triggerReboot).toHaveBeenCalledWith("exp-1");
-      });
-
-      it("marks the cache entry as rebootTriggered", async () => {
-        await request(app).get("/?accessToken=mytoken");
-        expect(mockedCache.setTokenCache).toHaveBeenCalledWith(
-          "mytoken",
-          expect.objectContaining({ rebootTriggered: true }),
-        );
-      });
-
-      it("does not trigger a second reboot once already triggered", async () => {
-        mockedCache.fetchTokenCache.mockReturnValue({ ...cachedShift, rebootTriggered: true });
-        await request(app).get("/?accessToken=mytoken");
-        expect(mockedReboot.triggerReboot).not.toHaveBeenCalled();
+        expect(mockedPendingReboots.schedulePendingReboot).not.toHaveBeenCalled();
       });
 
       it("returns a plain 401 for a background poll (no Sec-Fetch-Mode)", async () => {
@@ -339,6 +321,43 @@ describe("authMiddleware", () => {
         expect(res.headers["set-cookie"]).toEqual(
           expect.arrayContaining([expect.stringContaining("labrem_token=mytoken")]),
         );
+      });
+
+      describe("recording a reboot at the token's own expiry", () => {
+        const EXP_SECONDS = 1_800_000_000;
+
+        beforeEach(() => {
+          mockedJwt.getExpFromToken.mockReturnValue(EXP_SECONDS);
+        });
+
+        it("records the reboot against the token's expiry, keyed by shift", async () => {
+          await request(app).get("/?accessToken=mytoken");
+
+          expect(mockedPendingReboots.schedulePendingReboot).toHaveBeenCalledWith({
+            shiftId: "1",
+            experienceId: "exp-1",
+            expiresAt: EXP_SECONDS * 1000,
+          });
+        });
+
+        // De-duping now lives in the store, so the middleware is free to write
+        // on every poll — but it must still hand over an identical record, or
+        // the store would treat it as a new deadline.
+        it("records the same shift identically on a later poll", async () => {
+          await request(app).get("/?accessToken=mytoken");
+          await request(app).get("/?accessToken=mytoken");
+
+          const calls = mockedPendingReboots.schedulePendingReboot.mock.calls;
+          expect(calls).toHaveLength(2);
+          expect(calls[0]).toEqual(calls[1]);
+        });
+
+        it("records nothing when the token carries no usable expiry", async () => {
+          mockedJwt.getExpFromToken.mockReturnValue(null);
+          await request(app).get("/?accessToken=mytoken");
+
+          expect(mockedPendingReboots.schedulePendingReboot).not.toHaveBeenCalled();
+        });
       });
     });
 

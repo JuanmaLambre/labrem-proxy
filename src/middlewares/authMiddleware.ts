@@ -5,9 +5,9 @@ import { cache, fetchTokenCache, setInvalidCache, setTokenCache } from "../auth/
 import config from "../config.ts";
 import { Shift } from "../../client/src/models/Shift.ts";
 import { User } from "../../client/src/models/User.ts";
-import { expiredToken } from "../auth/jwt.ts";
+import { expiredToken, getExpFromToken } from "../auth/jwt.ts";
 import { extractToken, setTokenCookie, isTopLevelNavigation } from "./utils.ts";
-import { triggerReboot } from "../reboot.ts";
+import { schedulePendingReboot } from "../pendingReboots.ts";
 
 interface ShiftValidation {
   valid: boolean;
@@ -91,20 +91,23 @@ async function getShift(token: string): Promise<ShiftValidation> {
   return { valid: true, shift, user, ...validation };
 }
 
+function scheduleRebootAtExpiry(token: string, shift: Shift): void {
+  const expSeconds = getExpFromToken(token);
+  const experienceId = shift.experience?.id;
+  if (!expSeconds || !experienceId) return;
+
+  schedulePendingReboot({
+    shiftId: String(shift.id),
+    experienceId,
+    expiresAt: expSeconds * 1000,
+  });
+}
+
 async function validateToken(token: string | undefined, req: Request): Promise<TokenValidation> {
   if (!token) return { valid: false, message: "Necesita loguearse" };
 
   if (expiredToken(token)) {
-    const cached = fetchTokenCache(token);
-    const experience = cached?.shift?.experience;
-
-    // Reboot the physical lab hardware exactly once per shift, the first time
-    // we observe the expired token (regardless of whether this request is a
-    // background poll or a page navigation).
-    if (cached && !cached.rebootTriggered) {
-      triggerReboot(experience?.id);
-      setTokenCache(token, { ...cached, rebootTriggered: true });
-    }
+    const experience = fetchTokenCache(token)?.shift?.experience;
 
     if (isTopLevelNavigation(req) && experience?.name) {
       const name = encodeURIComponent(experience.name);
@@ -132,6 +135,7 @@ async function validateToken(token: string | undefined, req: Request): Promise<T
   setTokenCache(token, { shift: shift.toJSON(), user: user?.toJSON(), fetched: !!shiftValidation.fetched });
 
   if (shift.isOpen) {
+    scheduleRebootAtExpiry(token, shift);
     return { valid: true, shift };
   } else {
     const msUntilOpen = new Date(`${shift.day}T${shift.startTime}`).getTime() - Date.now();

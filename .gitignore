@@ -16,5 +16,8 @@ targets.json
 rebootTargets.json
 !rebootTargets.json.example
 
+# Runtime state
+pendingReboots.json
+
 labrem-proxy-*.zip
 local/
