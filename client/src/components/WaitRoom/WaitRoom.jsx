@@ -1,21 +1,24 @@
 import React, { useEffect } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
+
+// Only same-origin paths are allowed to prevent open redirect vulnerabilities.
+function safeReturnTo(value) {
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) return "/";
+  return value;
+}
 
 export default function WaitRoom() {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const name = searchParams.get("name");
   const redirectIn = parseInt(searchParams.get("redirectIn"));
   const finished = searchParams.get("reason") === "finalizado";
-
-  const redirect = () => {
-    navigate("/");
-  };
+  const returnTo = safeReturnTo(searchParams.get("returnTo"));
 
   useEffect(() => {
     // A finished shift must not bounce the student back into the experience.
     if (finished) return;
-    setTimeout(redirect, redirectIn);
+    const timer = setTimeout(() => window.location.assign(returnTo), redirectIn);
+    return () => clearTimeout(timer);
   }, []);
 
   return (
@@ -29,8 +32,7 @@ export default function WaitRoom() {
 
         {finished ? (
           <p className="text-slate-300 text-base leading-relaxed">
-            Su turno para <span className="text-blue-400 font-medium">{name}</span> finalizó. ¡Gracias por
-            participar!
+            Su turno para <span className="text-blue-400 font-medium">{name}</span> finalizó. ¡Gracias por participar!
           </p>
         ) : (
           <>

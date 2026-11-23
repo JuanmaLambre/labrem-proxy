@@ -414,10 +414,18 @@ describe("authMiddleware", () => {
         });
       });
 
-      it("redirects to /proxy/espera with name and redirectIn", async () => {
+      it("redirects to /proxy/espera with name, redirectIn and the original URL", async () => {
         const res = await request(app).get("/?accessToken=mytoken");
         expect(res.status).toBe(302);
-        expect(res.headers.location).toMatch(/^\/proxy\/espera\?name=Test%20Lab&redirectIn=\d+$/);
+        expect(res.headers.location).toMatch(
+          /^\/proxy\/espera\?name=Test%20Lab&redirectIn=\d+&returnTo=%2F%3FaccessToken%3Dmytoken$/,
+        );
+      });
+
+      it("keeps the original path and query so the wait room can reload it", async () => {
+        const res = await request(app).get("/lab/page?x=1&accessToken=mytoken");
+        const returnTo = new URL(res.headers.location, "http://proxy").searchParams.get("returnTo");
+        expect(returnTo).toBe("/lab/page?x=1&accessToken=mytoken");
       });
 
       it("caches the token", async () => {

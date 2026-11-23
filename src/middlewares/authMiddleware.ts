@@ -140,7 +140,8 @@ async function validateToken(token: string | undefined, req: Request): Promise<T
   } else {
     const msUntilOpen = new Date(`${shift.day}T${shift.startTime}`).getTime() - Date.now();
     const name = encodeURIComponent(shift.experience.name);
-    const redirectTo = `/proxy/espera?name=${name}&redirectIn=${msUntilOpen}`;
+    const returnTo = encodeURIComponent(req.originalUrl);
+    const redirectTo = `/proxy/espera?name=${name}&redirectIn=${msUntilOpen}&returnTo=${returnTo}`;
     return { valid: true, redirectTo };
   }
 }

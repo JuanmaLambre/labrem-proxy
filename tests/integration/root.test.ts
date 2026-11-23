@@ -126,7 +126,9 @@ describe("End-to-end tests", () => {
 
       const res = await request(app).get(`/?accessToken=${token}`);
       expect(res.status).toBe(302);
-      expect(res.headers.location).toMatch(/^\/proxy\/espera\?name=Test%20Lab&redirectIn=\d+$/);
+      expect(res.headers.location).toMatch(/^\/proxy\/espera\?name=Test%20Lab&redirectIn=\d+&returnTo=/);
+      const returnTo = new URL(res.headers.location, "http://proxy").searchParams.get("returnTo");
+      expect(returnTo).toBe(`/?accessToken=${token}`);
     });
   });
 
