@@ -361,6 +361,44 @@ describe("authMiddleware", () => {
       });
     });
 
+    // A capacity-1 shift reports availability: false as soon as this very
+    // student takes it; that must not keep them in the waiting room.
+    describe("and the API returns an open shift with no free seats left", () => {
+      const fullShiftResponse = {
+        status: 200,
+        data: {
+          ...openApiResponse.data,
+          assignments: {
+            ...openApiResponse.data.assignments,
+            shift_details: { ...openApiResponse.data.assignments.shift_details, availability: false },
+          },
+        },
+      };
+
+      beforeEach(() => {
+        mockedAxios.get.mockResolvedValue(fullShiftResponse);
+      });
+
+      it("lets the assigned student in", async () => {
+        const res = await request(app).get("/?accessToken=mytoken");
+        expect(res.body).toEqual({ success: true });
+      });
+
+      it("still lets them in once the shift is served from cache", async () => {
+        mockedCache.fetchTokenCache.mockReturnValue({
+          valid: true,
+          fresh: true,
+          timestamp: Date.now(),
+          shift: { ...openShiftData, availability: false },
+          user: userData,
+        });
+
+        const res = await request(app).get("/?accessToken=mytoken");
+        expect(res.body).toEqual({ success: true });
+        expect(mockedAxios.get).not.toHaveBeenCalled();
+      });
+    });
+
     describe("and the API returns a shift not yet open", () => {
       beforeEach(() => {
         mockedAxios.get.mockResolvedValue({

@@ -27,8 +27,6 @@ export class Shift {
   }
 
   get isOpen(): boolean {
-    if (!this.availability) return false;
-
     const now = Date.now();
     const startDatetime = new Date(`${this.day}T${this.startTime}`);
     const endDatetime = new Date(`${this.day}T${this.endTime}`);
