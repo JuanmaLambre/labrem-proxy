@@ -6,7 +6,7 @@ const TEST_COOKIE_NAME = "test_destination";
 
 export function testMiddleware(req: Request, res: Response, next: NextFunction): void | Response {
   const proxyEnabled = config.testProxyEnabled;
-  if (proxyEnabled) console.warn("Test Proxy enabled");
+  if (proxyEnabled) console.warn("Test Proxy enabled. Remove TEST_PROXY_ENABLED if left on true.");
 
   const experienceId = req.cookies?.[TEST_COOKIE_NAME];
 
